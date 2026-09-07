@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { useAchievements } from './AchievementsContext';
 import { AvatarDisplay } from './AvatarDisplay';
+import { getHlAccountName } from '../utils/nameGenerator';
 
 interface NavbarProps {
   onSearch: (query: string) => void;
@@ -112,11 +113,11 @@ export const Navbar: React.FC<NavbarProps> = ({ onSearch }) => {
           <div className="flex items-center gap-2 ml-1">
             <div className="hidden lg:block text-right">
               <p className="text-[11px] font-bold text-white leading-none mb-0.5 flex items-center gap-1 justify-end">
-                {isOwner && <Crown className="w-3 h-3 text-amber-400 inline" />}
-                {profile?.nickname || user.displayName}
+                {(isOwner || user.email?.toLowerCase() === 'c65043679@gmail.com') && <Crown className="w-3 h-3 text-amber-400 inline" />}
+                {isOwner || user.email?.toLowerCase() === 'c65043679@gmail.com' ? 'Gordon Freeman' : getHlAccountName(user.uid, false, user.email, profile?.nickname || user.displayName)}
               </p>
               <p className="text-[9px] text-amber-400/90 font-mono font-bold leading-none">
-                {isOwner ? '👑 OWNER' : 'Nexus Member'}
+                {isOwner || user.email?.toLowerCase() === 'c65043679@gmail.com' ? '👑 GORDON FREEMAN (OWNER)' : 'Half-Life Combatant'}
               </p>
             </div>
             <Link to="/cases" title="View Inventory & Change Avatar">

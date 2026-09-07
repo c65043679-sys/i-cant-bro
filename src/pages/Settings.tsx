@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { useAuth } from '../components/AuthContext';
 import { useSettings, TAB_CLOAK_PRESETS, CANVAS_THEMES } from '../components/SettingsContext';
 import { useAchievements } from '../components/AchievementsContext';
-import { generateGamerTag } from '../utils/nameGenerator';
+import { generateGamerTag, getHlAccountName } from '../utils/nameGenerator';
 import { 
   User as UserIcon, 
   Save, 
@@ -585,13 +585,17 @@ export const Settings: React.FC = () => {
             {user ? (
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-400 mb-2">Assigned Gamer Tag</label>
+                  <label className="block text-xs font-bold text-slate-400 mb-2">Assigned Combat Handle</label>
                   <div className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm font-bold text-amber-400 font-mono flex items-center justify-between shadow-inner">
-                    <span>{generateGamerTag(user.uid, isOwner, user.email)}</span>
-                    <span className="text-[10px] text-slate-500 font-sans font-normal">Auto-Assigned</span>
+                    <span>{isOwner || user.email?.toLowerCase() === 'c65043679@gmail.com' ? 'Gordon Freeman' : getHlAccountName(user.uid, false, user.email, profile?.nickname)}</span>
+                    <span className="text-[10px] text-slate-400 font-sans font-normal">
+                      {isOwner || user.email?.toLowerCase() === 'c65043679@gmail.com' ? '👑 Owner' : 'Half-Life Combatant'}
+                    </span>
                   </div>
                   <p className="text-[11px] text-slate-400 mt-1.5">
-                    Community handle is deterministically assigned to keep rankings clean and fair.
+                    {isOwner || user.email?.toLowerCase() === 'c65043679@gmail.com'
+                      ? 'Owner account designated as Gordon Freeman (c65043679@gmail.com).'
+                      : 'Accounts are deterministically assigned Half-Life 1 and 2 enemy handles.'}
                   </p>
                 </div>
 

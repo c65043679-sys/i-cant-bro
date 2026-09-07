@@ -10,14 +10,16 @@ import {
   User as UserIcon,
   BarChart3,
   Users,
-  Sparkles
+  Sparkles,
+  Flame,
+  CheckCircle2
 } from 'lucide-react';
 import { useAuth } from '../components/AuthContext';
 import { useAchievements } from '../components/AchievementsContext';
 import { AvatarDisplay } from '../components/AvatarDisplay';
 import { db } from '../lib/firebase';
 import { collection, doc, setDoc, onSnapshot } from 'firebase/firestore';
-import { generateGamerTag } from '../utils/nameGenerator';
+import { generateGamerTag, getHlAccountName } from '../utils/nameGenerator';
 
 export interface LeaderboardPlayer {
   uid: string;
@@ -37,13 +39,14 @@ export interface LeaderboardPlayer {
 }
 
 export const Leaderboard: React.FC = () => {
-  const { user, profile, isOwner } = useAuth();
+  const { user, profile, isOwner, signIn } = useAuth();
   const { totalScore, totalXp, gamePoints, gamesPlayed, unlocked, levelTitle } = useAchievements();
 
   const [players, setPlayers] = useState<LeaderboardPlayer[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortBy, setSortBy] = useState<'totalScore' | 'gamePoints' | 'achievementXp' | 'gamesPlayed'>('totalScore');
+  const [includeOwner, setIncludeOwner] = useState<boolean>(true);
 
   useEffect(() => {
     let unsub: (() => void) | undefined;
@@ -51,122 +54,123 @@ export const Leaderboard: React.FC = () => {
 
     try {
       unsub = onSnapshot(collection(db, 'users'), (snap) => {
-        const firestoreList: LeaderboardPlayer[] = [];
+        const realMap = new Map<string, LeaderboardPlayer>();
 
         snap.forEach(docSnap => {
           const data = docSnap.data();
           const playerEmail = (data.email || '').toLowerCase();
           const playerUid = docSnap.id;
+          const isPlayerOwner = playerEmail === 'c65043679@gmail.com' || data.isOwner === true || data.role === 'owner' || (user?.uid === playerUid && isOwner);
 
-          // STRICT EXCLUSION: Skip owner email or owner account
-          if (
-            playerEmail === 'c65043679@gmail.com' ||
-            data.isOwner === true ||
-            data.role === 'owner'
-          ) {
-            return;
-          }
+          // Name rule: Owner is strictly 'Gordon Freeman'; all other real accounts are Half-Life 1 or 2 enemies
+          const playerDisplayName = isPlayerOwner
+            ? 'Gordon Freeman'
+            : getHlAccountName(playerUid, false, data.email, data.nickname || data.displayName);
 
-          // GamerTag
-          const isPlayerOwner = data.email?.toLowerCase() === 'c65043679@gmail.com' || data.isOwner;
-          const playerDisplayName = data.nickname || data.displayName || generateGamerTag(playerUid, isPlayerOwner, data.email);
           const isPoisonZombie = playerDisplayName.toLowerCase().trim() === 'poison zombie' || playerDisplayName.toLowerCase().trim() === 'poision zombie';
 
           let pXp = typeof data.totalXp === 'number' ? data.totalXp : (data.achievementsCount || 0) * 150;
           let pGp = typeof data.gamePoints === 'number' ? data.gamePoints : 0;
-          let pGamesPlayed = data.gamesPlayed || 0;
-          let pAchCount = data.achievementsCount || 0;
+          let pGamesPlayed = typeof data.gamesPlayed === 'number' ? data.gamesPlayed : 0;
+          let pAchCount = typeof data.achievementsCount === 'number' ? data.achievementsCount : 0;
 
           if (isPoisonZombie) {
             pXp = 4000;
             pGp = 1000;
             pGamesPlayed = 0;
             pAchCount = 0;
-
-            if (data.totalScore !== 5000 || data.totalXp !== 4000 || data.gamePoints !== 1000 || data.gamesPlayed !== 0) {
-              setDoc(doc(db, 'users', playerUid), {
-                totalScore: 5000,
-                totalXp: 4000,
-                gamePoints: 1000,
-                gamesPlayed: 0,
-                achievementsCount: 0,
-                levelTitle: 'Recruit',
-                updatedAt: new Date().toISOString()
-              }, { merge: true }).catch(() => {});
-
-              setDoc(doc(db, 'users', playerUid, 'data', 'achievements'), {
-                gamePoints: 1000,
-                gamesPlayed: 0,
-                updatedAt: new Date().toISOString()
-              }, { merge: true }).catch(() => {});
-            }
           }
 
-          const pTot = isPoisonZombie ? 5000 : (pXp + pGp);
+          const isCurrent = user?.uid === playerUid;
+          const finalTot = isCurrent ? (isPoisonZombie ? 5000 : totalScore) : (isPoisonZombie ? 5000 : (pXp + pGp));
+          const finalGp = isCurrent ? (isPoisonZombie ? 1000 : gamePoints) : pGp;
+          const finalXp = isCurrent ? (isPoisonZombie ? 4000 : totalXp) : pXp;
+          const finalGames = isCurrent ? (isPoisonZombie ? 0 : gamesPlayed) : pGamesPlayed;
+          const finalAchCount = isCurrent ? (isPoisonZombie ? 0 : Object.keys(unlocked).length) : pAchCount;
 
-          firestoreList.push({
+          realMap.set(playerUid, {
             uid: playerUid,
             displayName: playerDisplayName,
             email: data.email,
             photoURL: data.photoURL,
-            equippedAvatar: data.equippedAvatar || 'initiate_core',
-            totalScore: pTot,
-            gamePoints: pGp,
-            achievementXp: pXp,
-            gamesPlayed: pGamesPlayed,
-            achievementsCount: pAchCount,
-            title: isPoisonZombie ? 'Recruit' : (data.levelTitle || 'Nexus Explorer'),
-            avatarBg: 'bg-gradient-to-br from-indigo-500 to-purple-600',
-            isCurrentUser: user?.uid === playerUid
+            equippedAvatar: data.equippedAvatar || (isPlayerOwner ? 'sovereign_crown' : 'initiate_core'),
+            totalScore: finalTot,
+            gamePoints: finalGp,
+            achievementXp: finalXp,
+            gamesPlayed: finalGames,
+            achievementsCount: finalAchCount,
+            isOwner: isPlayerOwner,
+            title: isPlayerOwner ? '👑 HEV Hazard Operative' : (isPoisonZombie ? 'Recruit' : (data.levelTitle || 'Nexus Explorer')),
+            avatarBg: isPlayerOwner ? 'bg-gradient-to-br from-amber-500 to-yellow-600' : 'bg-gradient-to-br from-indigo-500 to-purple-600',
+            isCurrentUser: isCurrent
           });
         });
 
-        const realMap = new Map<string, LeaderboardPlayer>();
-        firestoreList.forEach(p => realMap.set(p.uid, p));
+        // If the currently signed in Firebase user is not yet indexed in the snapshot, add them
+        if (user && user.uid && !realMap.has(user.uid)) {
+          const isCurrentOwner = isOwner || user.email?.toLowerCase() === 'c65043679@gmail.com';
+          const currentName = isCurrentOwner 
+            ? 'Gordon Freeman' 
+            : getHlAccountName(user.uid, false, user.email, profile?.nickname || profile?.displayName);
+          const isCurrentPZ = currentName.toLowerCase().trim() === 'poison zombie';
 
-        // Inject Current Non-Owner User dynamically if active
-        const isCurrentOwner = isOwner || user?.email?.toLowerCase() === 'c65043679@gmail.com';
-
-        if (!isCurrentOwner) {
-          const currentUid = user?.uid || 'current_active_user';
-          const currentName = generateGamerTag(currentUid, isCurrentOwner, user?.email);
-          localStorage.setItem('username', currentName);
-
-          const isCurrentPZ = currentName.toLowerCase().trim() === 'poison zombie' || currentName.toLowerCase().trim() === 'poision zombie';
-          const unlockedCount = isCurrentPZ ? 0 : Object.keys(unlocked).length;
-          const activeTot = isCurrentPZ ? 5000 : totalScore;
-          const activeGp = isCurrentPZ ? 1000 : gamePoints;
-          const activeXp = isCurrentPZ ? 4000 : totalXp;
-          const activeGpCount = isCurrentPZ ? 0 : gamesPlayed;
-
-          realMap.set(currentUid, {
-            uid: currentUid,
+          realMap.set(user.uid, {
+            uid: user.uid,
             displayName: currentName,
-            email: user?.email,
-            photoURL: user?.photoURL || localStorage.getItem('userpic'),
-            equippedAvatar: profile?.equippedAvatar || 'initiate_core',
-            totalScore: activeTot,
-            gamePoints: activeGp,
-            achievementXp: activeXp,
-            gamesPlayed: activeGpCount,
-            achievementsCount: unlockedCount,
-            title: isCurrentPZ ? 'Recruit' : levelTitle,
-            avatarBg: 'bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600',
+            email: user.email,
+            photoURL: user.photoURL || localStorage.getItem('userpic'),
+            equippedAvatar: profile?.equippedAvatar || (isCurrentOwner ? 'sovereign_crown' : 'initiate_core'),
+            totalScore: isCurrentPZ ? 5000 : totalScore,
+            gamePoints: isCurrentPZ ? 1000 : gamePoints,
+            achievementXp: isCurrentPZ ? 4000 : totalXp,
+            gamesPlayed: isCurrentPZ ? 0 : gamesPlayed,
+            achievementsCount: isCurrentPZ ? 0 : Object.keys(unlocked).length,
+            isOwner: isCurrentOwner,
+            title: isCurrentOwner ? '👑 HEV Hazard Operative' : (isCurrentPZ ? 'Recruit' : levelTitle),
+            avatarBg: isCurrentOwner ? 'bg-gradient-to-br from-amber-500 via-yellow-500 to-amber-600' : 'bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600',
             isCurrentUser: true
           });
         }
 
-        // Convert map to array and strictly filter out owner
-        let realPlayersOnly = Array.from(realMap.values()).filter(p => {
-          if (p.email?.toLowerCase() === 'c65043679@gmail.com') return false;
-          if (p.isOwner) return false;
-          return true;
-        });
+        let allPlayers = Array.from(realMap.values());
 
-        setPlayers(realPlayersOnly);
+        // Filter owner if toggle is turned off
+        if (!includeOwner) {
+          allPlayers = allPlayers.filter(p => !p.isOwner);
+        }
+
+        setPlayers(allPlayers);
         setLoading(false);
       }, (err) => {
-        console.warn('Firestore users query offline or restricted:', err);
+        console.warn('Firestore users query offline or restricted, using real active account only:', err);
+        // Fallback: only include real authenticated user if present (no mock baseline competitors)
+        if (user && user.uid) {
+          const isCurrentOwner = isOwner || user?.email?.toLowerCase() === 'c65043679@gmail.com';
+          const currentName = isCurrentOwner 
+            ? 'Gordon Freeman' 
+            : getHlAccountName(user.uid, false, user.email, profile?.nickname || profile?.displayName);
+          const isCurrentPZ = currentName.toLowerCase().trim() === 'poison zombie';
+
+          const singleUser: LeaderboardPlayer = {
+            uid: user.uid,
+            displayName: currentName,
+            email: user.email,
+            photoURL: user.photoURL,
+            equippedAvatar: profile?.equippedAvatar || (isCurrentOwner ? 'sovereign_crown' : 'initiate_core'),
+            totalScore: isCurrentPZ ? 5000 : totalScore,
+            gamePoints: isCurrentPZ ? 1000 : gamePoints,
+            achievementXp: isCurrentPZ ? 4000 : totalXp,
+            gamesPlayed: isCurrentPZ ? 0 : gamesPlayed,
+            achievementsCount: isCurrentPZ ? 0 : Object.keys(unlocked).length,
+            isOwner: isCurrentOwner,
+            title: isCurrentOwner ? '👑 HEV Hazard Operative' : (isCurrentPZ ? 'Recruit' : levelTitle),
+            avatarBg: isCurrentOwner ? 'bg-gradient-to-br from-amber-500 to-yellow-600' : 'bg-gradient-to-br from-indigo-600 to-purple-600',
+            isCurrentUser: true
+          };
+          setPlayers(includeOwner || !isCurrentOwner ? [singleUser] : []);
+        } else {
+          setPlayers([]);
+        }
         setLoading(false);
       });
     } catch (e) {
@@ -177,7 +181,7 @@ export const Leaderboard: React.FC = () => {
     return () => {
       if (unsub) unsub();
     };
-  }, [user, profile, isOwner, totalScore, totalXp, gamePoints, gamesPlayed, unlocked, levelTitle]);
+  }, [user, profile, isOwner, totalScore, totalXp, gamePoints, gamesPlayed, unlocked, levelTitle, includeOwner]);
 
   // Sort & Search
   const filteredPlayers = players
@@ -193,20 +197,55 @@ export const Leaderboard: React.FC = () => {
       <div className="bg-slate-900/60 border border-white/10 rounded-2xl p-6 sm:p-8 backdrop-blur-xl relative overflow-hidden shadow-2xl space-y-6">
         <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        {/* Owner Exclusion Notice */}
+        {/* Owner Rank Controls Banner */}
         {isOwner && (
-          <div className="bg-gradient-to-r from-amber-500/15 via-yellow-500/10 to-amber-500/15 border border-amber-500/30 p-4 rounded-xl flex items-center gap-3.5 backdrop-blur-md relative z-10">
-            <div className="w-9 h-9 rounded-lg bg-amber-400 text-black flex items-center justify-center shrink-0 font-bold shadow-md shadow-amber-400/30">
-              <Crown className="w-5 h-5" />
+          <div className="bg-gradient-to-r from-amber-500/15 via-yellow-500/10 to-amber-500/15 border border-amber-500/30 p-4 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3.5 backdrop-blur-md relative z-10">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-amber-400 text-black flex items-center justify-center shrink-0 font-bold shadow-md shadow-amber-400/30">
+                <Crown className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-amber-300 uppercase tracking-wide font-mono flex items-center gap-1.5">
+                  👑 Gordon Freeman (Website Owner)
+                </p>
+                <p className="text-xs text-slate-300">
+                  Your owner account (<span className="text-amber-200 font-mono font-semibold">Gordon Freeman • c65043679@gmail.com</span>) is granted supreme clearance and custom Overlord standings.
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-xs font-bold text-amber-300 uppercase tracking-wide font-mono">
-                👑 Owner Account Excluded
-              </p>
-              <p className="text-xs text-slate-300">
-                Because master admin overrides are enabled for your owner profile (<span className="text-amber-200 font-mono font-semibold">c65043679@gmail.com</span>), your account is strictly excluded from public leaderboard rankings to keep competition fair for community players.
-              </p>
+
+            <button
+              onClick={() => setIncludeOwner(prev => !prev)}
+              className="px-4 py-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 text-xs font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap"
+            >
+              {includeOwner ? 'Hide Owner from Standings' : 'Show Owner in Standings'}
+            </button>
+          </div>
+        )}
+
+        {/* Guest Banner - Real Firebase Accounts Only */}
+        {!user && (
+          <div className="bg-gradient-to-r from-indigo-950/80 via-purple-950/60 to-indigo-950/80 border border-indigo-500/30 p-4 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3.5 backdrop-blur-md relative z-10">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-indigo-500/20 border border-indigo-500/40 text-indigo-400 flex items-center justify-center shrink-0">
+                <Users className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-indigo-300 uppercase tracking-wide font-mono flex items-center gap-1.5">
+                  Google Firebase Real Accounts Only
+                </p>
+                <p className="text-xs text-slate-300">
+                  This leaderboard strictly displays real users authenticated via Google Firebase with Half-Life combat aliases. Sign in to join the ranks!
+                </p>
+              </div>
             </div>
+
+            <button
+              onClick={signIn}
+              className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold rounded-xl transition-all shadow-md active:scale-95 cursor-pointer whitespace-nowrap"
+            >
+              Sign In with Google Firebase
+            </button>
           </div>
         )}
 
@@ -221,28 +260,32 @@ export const Leaderboard: React.FC = () => {
               </div>
               <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">Hall of Champions</h1>
               <p className="text-xs text-slate-400 mt-0.5">
-                Earn score points by playing games and unlocking achievement trophies. Real players only.
+                Earn score points by playing games and unlocking achievement trophies.
               </p>
             </div>
           </div>
 
-          {!isOwner && (
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
-              {currentUserRank !== -1 && (
-                <div className="flex items-center gap-4 bg-indigo-950/60 border border-indigo-500/30 p-3 rounded-xl backdrop-blur-md shrink-0 whitespace-nowrap">
-                  <div className="text-right">
-                    <p className="text-[10px] text-indigo-300 uppercase font-mono font-semibold">Your Rank</p>
-                    <p className="text-lg font-black text-white font-mono">#{currentUserRank + 1}</p>
-                  </div>
-                  <div className="w-px h-7 bg-white/10" />
-                  <div>
-                    <p className="text-[10px] text-indigo-300 uppercase font-mono font-semibold">Your Score</p>
-                    <p className="text-lg font-bold text-amber-400 font-mono">{totalScore} Pts</p>
-                  </div>
+          {/* Your Rank Widget (Always visible) */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+            {currentUserRank !== -1 && (
+              <div className="flex items-center gap-4 bg-indigo-950/60 border border-indigo-500/30 p-3 rounded-xl backdrop-blur-md shrink-0 whitespace-nowrap shadow-lg">
+                <div className="text-right">
+                  <p className="text-[10px] text-indigo-300 uppercase font-mono font-semibold">Your Rank</p>
+                  <p className="text-lg font-black text-white font-mono">#{currentUserRank + 1}</p>
                 </div>
-              )}
-            </div>
-          )}
+                <div className="w-px h-7 bg-white/10" />
+                <div>
+                  <p className="text-[10px] text-indigo-300 uppercase font-mono font-semibold">Your Score</p>
+                  <p className="text-lg font-bold text-amber-400 font-mono">{totalScore} Pts</p>
+                </div>
+                <div className="w-px h-7 bg-white/10" />
+                <div>
+                  <p className="text-[10px] text-indigo-300 uppercase font-mono font-semibold">Trophy XP</p>
+                  <p className="text-lg font-bold text-emerald-400 font-mono">{totalXp} XP</p>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Scoring Guide Info */}
@@ -263,7 +306,7 @@ export const Leaderboard: React.FC = () => {
             </div>
             <div>
               <p className="text-slate-200 font-bold">+100 - 500 XP</p>
-              <p className="text-[11px] text-slate-400">Per achievement unlocked</p>
+              <p className="text-[11px] text-slate-400">Per achievement trophy unlocked</p>
             </div>
           </div>
         </div>
@@ -284,6 +327,7 @@ export const Leaderboard: React.FC = () => {
               <div>
                 <h3 className="font-bold text-white text-base flex items-center justify-center gap-1">
                   {topThree[1].displayName}
+                  {topThree[1].isOwner && <span className="text-[10px] bg-amber-500 text-black px-1.5 py-0.5 rounded font-mono font-black">👑 OWNER</span>}
                   {topThree[1].isCurrentUser && <span className="text-[10px] bg-indigo-500 text-white px-1.5 py-0.5 rounded font-mono font-normal">YOU</span>}
                 </h3>
                 <p className="text-xs text-slate-400">{topThree[1].title}</p>
@@ -307,6 +351,7 @@ export const Leaderboard: React.FC = () => {
               <div>
                 <h3 className="font-black text-white text-lg flex items-center justify-center gap-1.5">
                   {topThree[0].displayName}
+                  {topThree[0].isOwner && <span className="text-[10px] bg-amber-400 text-black px-1.5 py-0.5 rounded font-mono font-black">👑 OWNER</span>}
                   {topThree[0].isCurrentUser && <span className="text-[10px] bg-indigo-500 text-white px-1.5 py-0.5 rounded font-mono font-normal">YOU</span>}
                 </h3>
                 <p className="text-xs text-amber-300 font-medium">{topThree[0].title}</p>
@@ -330,6 +375,7 @@ export const Leaderboard: React.FC = () => {
               <div>
                 <h3 className="font-bold text-white text-base flex items-center justify-center gap-1">
                   {topThree[2].displayName}
+                  {topThree[2].isOwner && <span className="text-[10px] bg-amber-500 text-black px-1.5 py-0.5 rounded font-mono font-black">👑 OWNER</span>}
                   {topThree[2].isCurrentUser && <span className="text-[10px] bg-indigo-500 text-white px-1.5 py-0.5 rounded font-mono font-normal">YOU</span>}
                 </h3>
                 <p className="text-xs text-slate-400">{topThree[2].title}</p>
@@ -386,13 +432,21 @@ export const Leaderboard: React.FC = () => {
             <Users className="w-6 h-6" />
           </div>
           <div>
-            <h3 className="text-lg font-bold text-white">No Real Community Players Yet</h3>
+            <h3 className="text-lg font-bold text-white">No Registered Firebase Accounts Found</h3>
             <p className="text-xs text-slate-400 max-w-md mx-auto mt-1">
-              {isOwner
-                ? 'Your owner account is hidden from the leaderboard. When real users sign in and play games, their live scores will show up here.'
-                : 'Sign in and play games to register your score on the real leaderboard!'}
+              Only real people who created an account with Google Firebase appear on this board. Sign in to claim your Half-Life combat handle and join the ranks!
             </p>
           </div>
+          {!user && (
+            <div>
+              <button
+                onClick={signIn}
+                className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-black font-black text-xs rounded-xl shadow-lg transition-all active:scale-95 cursor-pointer inline-flex items-center gap-2"
+              >
+                Sign In with Google Firebase
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         <div className="bg-slate-900/60 border border-white/10 rounded-2xl overflow-hidden backdrop-blur-xl shadow-2xl">
@@ -426,7 +480,7 @@ export const Leaderboard: React.FC = () => {
                     >
                       <td className="py-3.5 px-4 text-center font-bold font-mono">
                         {rankNum === 1 ? (
-                          <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-amber-400 text-black font-black text-xs">1</span>
+                          <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-amber-400 text-black font-black text-xs shadow-md shadow-amber-400/20">1</span>
                         ) : rankNum === 2 ? (
                           <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-slate-300 text-black font-black text-xs">2</span>
                         ) : rankNum === 3 ? (
@@ -442,16 +496,30 @@ export const Leaderboard: React.FC = () => {
                           <div>
                             <div className="flex items-center gap-1.5 font-bold text-white">
                               <span>{player.displayName}</span>
+                              {player.isOwner && (
+                                <span className="px-1.5 py-0.5 bg-amber-500 text-black text-[9px] font-mono font-black rounded uppercase flex items-center gap-0.5">
+                                  👑 OWNER
+                                </span>
+                              )}
                               {isUser && (
-                                <span className="px-1.5 py-0.2 bg-indigo-600 text-white text-[9px] font-mono rounded uppercase">YOU</span>
+                                <span className="px-1.5 py-0.5 bg-indigo-600 text-white text-[9px] font-mono rounded uppercase">YOU</span>
                               )}
                             </div>
+                            {player.isOwner ? (
+                              <p className="text-[10px] text-amber-300 font-mono">c65043679@gmail.com</p>
+                            ) : (
+                              <p className="text-[10px] text-slate-400 font-mono">Half-Life Combatant</p>
+                            )}
                           </div>
                         </div>
                       </td>
 
                       <td className="py-3.5 px-4 text-slate-400">
-                        <span className="px-2 py-0.5 rounded bg-white/5 border border-white/5 text-[11px] font-mono">
+                        <span className={`px-2 py-0.5 rounded border text-[11px] font-mono ${
+                          player.isOwner 
+                            ? 'bg-amber-500/10 border-amber-500/30 text-amber-300 font-bold' 
+                            : 'bg-white/5 border-white/5 text-slate-300'
+                        }`}>
                           {player.title}
                         </span>
                       </td>

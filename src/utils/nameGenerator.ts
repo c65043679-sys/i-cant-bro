@@ -3,7 +3,7 @@
  * Owner handle is strictly designated as 'Gordon Freeman'.
  */
 
-const HL_ENEMIES = [
+export const HL_ENEMIES = [
   'Headcrab',
   'Fast Headcrab',
   'Poison Headcrab',
@@ -43,11 +43,15 @@ const HL_ENEMIES = [
   'HECU Grunt',
   'Black Ops Assassin',
   'Alien Controller',
-  'Apache Gunship',
-  'Hydra',
   'Crab Synth',
   'Mortar Synth'
 ];
+
+export function isHlEnemy(name?: string | null): boolean {
+  if (!name) return false;
+  const n = name.trim().toLowerCase();
+  return HL_ENEMIES.some(e => e.toLowerCase() === n);
+}
 
 export function generateGamerTag(seed?: string | null, isOwner?: boolean, email?: string | null): string {
   if (isOwner || email?.toLowerCase() === 'c65043679@gmail.com') {
@@ -73,5 +77,17 @@ export function generateGamerTag(seed?: string | null, isOwner?: boolean, email?
   const enemy = HL_ENEMIES[positiveHash % HL_ENEMIES.length];
 
   return enemy;
+}
+
+export function getHlAccountName(seed?: string | null, isOwner?: boolean, email?: string | null, existingName?: string | null): string {
+  if (isOwner || email?.toLowerCase() === 'c65043679@gmail.com') {
+    return 'Gordon Freeman';
+  }
+
+  if (existingName && isHlEnemy(existingName)) {
+    return existingName;
+  }
+
+  return generateGamerTag(seed, false, email);
 }
 

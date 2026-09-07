@@ -225,12 +225,13 @@ interface AchievementsContextType {
   unlocked: Record<string, UnlockedAchievementData>;
   progressData: Record<string, number>;
   totalXp: number;
+  bonusXp: number;
   gamePoints: number;
   gamesPlayed: number;
   totalScore: number;
   level: number;
   levelTitle: string;
-  unlockAchievement: (id: string) => void;
+  unlockAchievement: (id: string, silent?: boolean) => void;
   unlockAllAchievements: () => void;
   wipeAllProgress: () => Promise<void>;
   incrementProgress: (id: string, amount?: number) => void;
@@ -240,6 +241,10 @@ interface AchievementsContextType {
   addGameTimePoints: (amount: number) => void;
   spendGamePoints: (amount: number) => boolean;
   addGamePoints: (amount: number) => void;
+  setCustomPoints: (amount: number) => void;
+  addBonusXp: (amount: number) => void;
+  setCustomXp: (amount: number) => void;
+  flushSave: () => Promise<void>;
   availableXp: number;
   spentXp: number;
   spendXp: (amount: number) => boolean;
@@ -312,6 +317,15 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   });
 
+  const [bonusXp, setBonusXp] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('nexus_bonus_xp');
+      return saved ? parseInt(saved, 10) || 0 : 0;
+    } catch (e) {
+      return 0;
+    }
+  });
+
   const [activeToast, setActiveToast] = useState<ToastNotification | null>(null);
   const [isRemoteLoaded, setIsRemoteLoaded] = useState<boolean>(false);
   const lastConfettiTime = useRef<number>(0);
@@ -326,24 +340,10 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
     progressDataRef.current = progressData;
   }, [progressData]);
 
-  // Sync with Firestore if logged in; reset on logout
+  // Sync with Firestore if logged in; merge without wiping local data
   useEffect(() => {
     if (!user) {
       setIsRemoteLoaded(true);
-      setUnlocked({});
-      setProgressData({});
-      setGamePoints(0);
-      setGamesPlayed(0);
-      setSpentXp(0);
-      unlockedRef.current = {};
-      progressDataRef.current = {};
-      try {
-        localStorage.removeItem('nexus_achievements');
-        localStorage.removeItem('nexus_achievements_progress');
-        localStorage.removeItem('nexus_game_points');
-        localStorage.removeItem('nexus_games_played');
-        localStorage.removeItem('nexus_spent_xp');
-      } catch (e) {}
       return;
     }
 
@@ -361,16 +361,43 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
           const mergedProgress = { ...remoteProgress, ...progressDataRef.current };
           const activeUname = (profile?.nickname || profile?.displayName || localStorage.getItem('username') || '').toLowerCase().trim();
           const isPZ = activeUname === 'poison zombie' || activeUname === 'poision zombie';
-          let maxGamePoints = Math.max(typeof remoteData.gamePoints === 'number' ? remoteData.gamePoints : 0, parseInt(localStorage.getItem('nexus_game_points') || '0', 10));
+          let maxGamePoints = Math.max(
+            typeof remoteData.gamePoints === 'number' ? remoteData.gamePoints : 0, 
+            parseInt(localStorage.getItem('nexus_game_points') || '0', 10),
+            gamePoints
+          );
           if (isPZ) maxGamePoints = Math.max(maxGamePoints, 1000);
-          const maxGamesPlayed = Math.max(typeof remoteData.gamesPlayed === 'number' ? remoteData.gamesPlayed : 0, parseInt(localStorage.getItem('nexus_games_played') || '0', 10));
-          const remoteSpentXp = typeof remoteData.spentXp === 'number' ? remoteData.spentXp : parseInt(localStorage.getItem('nexus_spent_xp') || '0', 10);
+          const maxGamesPlayed = Math.max(
+            typeof remoteData.gamesPlayed === 'number' ? remoteData.gamesPlayed : 0, 
+            parseInt(localStorage.getItem('nexus_games_played') || '0', 10),
+            gamesPlayed
+          );
+          const maxBonusXp = Math.max(
+            typeof remoteData.bonusXp === 'number' ? remoteData.bonusXp : 0,
+            parseInt(localStorage.getItem('nexus_bonus_xp') || '0', 10),
+            bonusXp
+          );
+          const remoteSpentXp = typeof remoteData.spentXp === 'number' 
+            ? remoteData.spentXp 
+            : parseInt(localStorage.getItem('nexus_spent_xp') || '0', 10);
 
+          unlockedRef.current = mergedUnlocked;
+          progressDataRef.current = mergedProgress;
           setUnlocked(mergedUnlocked);
           setProgressData(mergedProgress);
           setGamePoints(maxGamePoints);
           setGamesPlayed(maxGamesPlayed);
+          setBonusXp(maxBonusXp);
           setSpentXp(remoteSpentXp);
+
+          try {
+            localStorage.setItem('nexus_achievements', JSON.stringify(mergedUnlocked));
+            localStorage.setItem('nexus_achievements_progress', JSON.stringify(mergedProgress));
+            localStorage.setItem('nexus_game_points', maxGamePoints.toString());
+            localStorage.setItem('nexus_games_played', maxGamesPlayed.toString());
+            localStorage.setItem('nexus_bonus_xp', maxBonusXp.toString());
+            localStorage.setItem('nexus_spent_xp', remoteSpentXp.toString());
+          } catch (e) {}
         }
         setIsRemoteLoaded(true);
       }, (err) => {
@@ -388,73 +415,6 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   }, [user]);
 
-  // Persist locally and remotely (debounced by 5s to save Firebase quota)
-  useEffect(() => {
-    try {
-      localStorage.setItem('nexus_achievements', JSON.stringify(unlocked));
-      localStorage.setItem('nexus_achievements_progress', JSON.stringify(progressData));
-      localStorage.setItem('nexus_game_points', gamePoints.toString());
-      localStorage.setItem('nexus_games_played', gamesPlayed.toString());
-      localStorage.setItem('nexus_spent_xp', spentXp.toString());
-    } catch (e) {
-      console.error(e);
-    }
-
-    if (!user || !isRemoteLoaded) return;
-
-    const saveTimer = setTimeout(() => {
-      let activeName = profile?.nickname || profile?.displayName || localStorage.getItem('username') || 'Nexus Explorer';
-      if (containsProfanity(activeName) || activeName.toLowerCase().includes('sarsero')) {
-        activeName = 'Nexus Explorer';
-      }
-      const isPZ = activeName.toLowerCase().trim() === 'poison zombie' || activeName.toLowerCase().trim() === 'poision zombie';
-
-      const baseCurrentXp = Object.keys(unlocked).reduce((acc, id) => {
-        const ach = ACHIEVEMENTS_CATALOG.find(a => a.id === id);
-        return acc + (ach ? ach.xp : 0);
-      }, 0);
-
-      const currentXp = isPZ ? 4000 : baseCurrentXp;
-      const effectiveGp = isPZ ? Math.min(gamePoints, 1000) : gamePoints;
-      const totalScoreVal = isPZ ? 5000 : (currentXp + effectiveGp);
-      const effectiveGamesPlayed = isPZ ? 0 : gamesPlayed;
-      const currentLevel = Math.floor(totalScoreVal / 250) + 1;
-      const currentLevelTitle = isPZ ? 'Recruit' : LEVEL_TITLES[Math.min(currentLevel - 1, LEVEL_TITLES.length - 1)];
-
-      setDoc(doc(db, 'users', user.uid, 'data', 'achievements'), {
-        unlocked,
-        progress: progressData,
-        gamePoints: effectiveGp,
-        gamesPlayed: effectiveGamesPlayed,
-        spentXp,
-        updatedAt: new Date().toISOString()
-      }, { merge: true }).catch((err) => {
-        console.warn('Error saving remote achievements:', err);
-      });
-
-      const userDocData: any = {
-        uid: user.uid,
-        email: user.email,
-        photoURL: user.photoURL || localStorage.getItem('userpic') || null,
-        nickname: activeName,
-        displayName: activeName,
-        totalScore: totalScoreVal,
-        totalXp: currentXp,
-        gamePoints: effectiveGp,
-        gamesPlayed: effectiveGamesPlayed,
-        achievementsCount: isPZ ? 0 : Object.keys(unlocked).length,
-        levelTitle: currentLevelTitle,
-        updatedAt: new Date().toISOString()
-      };
-
-      setDoc(doc(db, 'users', user.uid), userDocData, { merge: true }).catch((err) => {
-        console.warn('Error updating user leaderboard doc:', err);
-      });
-    }, 5000);
-
-    return () => clearTimeout(saveTimer);
-  }, [unlocked, progressData, gamePoints, gamesPlayed, spentXp, user, profile, isRemoteLoaded]);
-
   const activeName = profile?.nickname || profile?.displayName || localStorage.getItem('username') || '';
   const isPoisonZombie = activeName.toLowerCase().trim() === 'poison zombie' || activeName.toLowerCase().trim() === 'poision zombie';
 
@@ -464,15 +424,116 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
     return acc + (ach ? ach.xp : 0);
   }, 0);
 
-  const totalXp = isPoisonZombie ? 4000 : baseTotalXp;
-
+  const totalXp = isPoisonZombie ? 4000 : (baseTotalXp + bonusXp);
   const availableXp = Math.max(0, totalXp - spentXp);
-
   const totalScore = isPoisonZombie ? 5000 : (totalXp + gamePoints);
   const effectiveGamesPlayed = isPoisonZombie ? 0 : gamesPlayed;
-
   const level = Math.floor(totalScore / 250) + 1;
   const levelTitle = isPoisonZombie ? 'Recruit' : LEVEL_TITLES[Math.min(level - 1, LEVEL_TITLES.length - 1)];
+
+  // Immediate save helper to sync state to Firestore and localStorage
+  const flushSave = useCallback(async () => {
+    try {
+      localStorage.setItem('nexus_achievements', JSON.stringify(unlockedRef.current));
+      localStorage.setItem('nexus_achievements_progress', JSON.stringify(progressDataRef.current));
+      localStorage.setItem('nexus_game_points', gamePoints.toString());
+      localStorage.setItem('nexus_games_played', gamesPlayed.toString());
+      localStorage.setItem('nexus_bonus_xp', bonusXp.toString());
+      localStorage.setItem('nexus_spent_xp', spentXp.toString());
+    } catch (e) {}
+
+    if (!user) return;
+
+    let activeUName = profile?.nickname || profile?.displayName || localStorage.getItem('username') || 'Nexus Explorer';
+    if (containsProfanity(activeUName) || activeUName.toLowerCase().includes('sarsero')) {
+      activeUName = 'Nexus Explorer';
+    }
+    const isPZ = activeUName.toLowerCase().trim() === 'poison zombie' || activeUName.toLowerCase().trim() === 'poision zombie';
+
+    const baseCurrentXp = Object.keys(unlockedRef.current).reduce((acc, id) => {
+      const ach = ACHIEVEMENTS_CATALOG.find(a => a.id === id);
+      return acc + (ach ? ach.xp : 0);
+    }, 0);
+
+    const currentXp = isPZ ? 4000 : (baseCurrentXp + bonusXp);
+    const effectiveGp = isPZ ? Math.min(gamePoints, 1000) : gamePoints;
+    const totalScoreVal = isPZ ? 5000 : (currentXp + effectiveGp);
+    const effectiveGamesPlayedCount = isPZ ? 0 : gamesPlayed;
+    const currentLevel = Math.floor(totalScoreVal / 250) + 1;
+    const currentLevelTitle = isPZ ? 'Recruit' : LEVEL_TITLES[Math.min(currentLevel - 1, LEVEL_TITLES.length - 1)];
+
+    try {
+      await setDoc(doc(db, 'users', user.uid, 'data', 'achievements'), {
+        unlocked: unlockedRef.current,
+        progress: progressDataRef.current,
+        gamePoints: effectiveGp,
+        gamesPlayed: effectiveGamesPlayedCount,
+        bonusXp,
+        spentXp,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+
+      const userDocData: any = {
+        uid: user.uid,
+        email: user.email,
+        photoURL: user.photoURL || localStorage.getItem('userpic') || null,
+        nickname: activeUName,
+        displayName: activeUName,
+        totalScore: totalScoreVal,
+        totalXp: currentXp,
+        bonusXp,
+        gamePoints: effectiveGp,
+        gamesPlayed: effectiveGamesPlayedCount,
+        achievementsCount: isPZ ? 0 : Object.keys(unlockedRef.current).length,
+        levelTitle: currentLevelTitle,
+        updatedAt: new Date().toISOString()
+      };
+
+      await setDoc(doc(db, 'users', user.uid), userDocData, { merge: true });
+    } catch (err) {
+      console.warn('Error in flushSave:', err);
+    }
+  }, [user, profile, gamePoints, gamesPlayed, bonusXp, spentXp]);
+
+  // Sync to localStorage on every change and debounce Firestore save (800ms)
+  useEffect(() => {
+    try {
+      localStorage.setItem('nexus_achievements', JSON.stringify(unlocked));
+      localStorage.setItem('nexus_achievements_progress', JSON.stringify(progressData));
+      localStorage.setItem('nexus_game_points', gamePoints.toString());
+      localStorage.setItem('nexus_games_played', gamesPlayed.toString());
+      localStorage.setItem('nexus_bonus_xp', bonusXp.toString());
+      localStorage.setItem('nexus_spent_xp', spentXp.toString());
+    } catch (e) {
+      console.error(e);
+    }
+
+    if (!user || !isRemoteLoaded) return;
+
+    const saveTimer = setTimeout(() => {
+      flushSave();
+    }, 800);
+
+    return () => clearTimeout(saveTimer);
+  }, [unlocked, progressData, gamePoints, gamesPlayed, bonusXp, spentXp, user, isRemoteLoaded, flushSave]);
+
+  // Flush saves on page close or tab hidden
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      flushSave();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        flushSave();
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [flushSave]);
 
   const recordGamePlay = useCallback((_gameId: string) => {
     setGamesPlayed(prev => prev + 1);
@@ -519,18 +580,36 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
     };
     unlockedRef.current = updated;
     setUnlocked(updated);
+    try {
+      localStorage.setItem('nexus_achievements', JSON.stringify(updated));
+    } catch (e) {}
+
+    // Flush immediately so it persists right away
+    setTimeout(() => {
+      flushSave();
+    }, 50);
 
     if (!silent) {
       triggerToast(ach);
     }
-  }, [triggerToast]);
+  }, [triggerToast, flushSave]);
 
   const unlockAllAchievements = useCallback(() => {
     const allUnlocked: Record<string, UnlockedAchievementData> = {};
     ACHIEVEMENTS_CATALOG.forEach(ach => {
       allUnlocked[ach.id] = { unlockedAt: Date.now() };
     });
+    unlockedRef.current = allUnlocked;
     setUnlocked(allUnlocked);
+    try {
+      localStorage.setItem('nexus_achievements', JSON.stringify(allUnlocked));
+    } catch (e) {}
+
+    // Flush immediately to firestore and localStorage
+    setTimeout(() => {
+      flushSave();
+    }, 50);
+
     soundManager.playLevelUp(settings.uiSoundEffects);
     try {
       confetti({
@@ -542,19 +621,25 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
     } catch (e) {
       console.error(e);
     }
-  }, [settings.uiSoundEffects]);
+  }, [settings.uiSoundEffects, flushSave]);
 
   const wipeAllProgress = useCallback(async () => {
     setUnlocked({});
     setProgressData({});
     setGamePoints(0);
     setGamesPlayed(0);
+    setBonusXp(0);
+    setSpentXp(0);
+    unlockedRef.current = {};
+    progressDataRef.current = {};
 
     try {
       localStorage.removeItem('nexus_achievements');
       localStorage.removeItem('nexus_achievements_progress');
       localStorage.removeItem('nexus_game_points');
       localStorage.removeItem('nexus_games_played');
+      localStorage.removeItem('nexus_bonus_xp');
+      localStorage.removeItem('nexus_spent_xp');
     } catch (e) {
       console.error(e);
     }
@@ -566,6 +651,8 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
           progress: {},
           gamePoints: 0,
           gamesPlayed: 0,
+          bonusXp: 0,
+          spentXp: 0,
           updatedAt: new Date().toISOString()
         });
 
@@ -578,6 +665,7 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
           photoURL: user.photoURL || null,
           totalScore: 0,
           totalXp: 0,
+          bonusXp: 0,
           gamePoints: 0,
           gamesPlayed: 0,
           achievementsCount: 0,
@@ -614,26 +702,71 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   const spendGamePoints = useCallback((amount: number): boolean => {
     if (gamePoints >= amount) {
-      setGamePoints(prev => Math.max(0, prev - amount));
+      setGamePoints(prev => {
+        const next = Math.max(0, prev - amount);
+        localStorage.setItem('nexus_game_points', next.toString());
+        return next;
+      });
       return true;
     }
     return false;
   }, [gamePoints]);
 
   const addGamePoints = useCallback((amount: number) => {
-    setGamePoints(prev => prev + amount);
+    setGamePoints(prev => {
+      const next = prev + amount;
+      localStorage.setItem('nexus_game_points', next.toString());
+      return next;
+    });
   }, []);
+
+  const setCustomPoints = useCallback((amount: number) => {
+    const val = Math.max(0, amount);
+    setGamePoints(val);
+    localStorage.setItem('nexus_game_points', val.toString());
+    setTimeout(() => {
+      flushSave();
+    }, 50);
+  }, [flushSave]);
+
+  const addBonusXp = useCallback((amount: number) => {
+    setBonusXp(prev => {
+      const next = Math.max(0, prev + amount);
+      localStorage.setItem('nexus_bonus_xp', next.toString());
+      return next;
+    });
+    setTimeout(() => {
+      flushSave();
+    }, 50);
+  }, [flushSave]);
+
+  const setCustomXp = useCallback((amount: number) => {
+    const val = Math.max(0, amount);
+    setBonusXp(val);
+    localStorage.setItem('nexus_bonus_xp', val.toString());
+    setTimeout(() => {
+      flushSave();
+    }, 50);
+  }, [flushSave]);
 
   const spendXp = useCallback((amount: number): boolean => {
     if (availableXp >= amount) {
-      setSpentXp(prev => prev + amount);
+      setSpentXp(prev => {
+        const next = prev + amount;
+        localStorage.setItem('nexus_spent_xp', next.toString());
+        return next;
+      });
       return true;
     }
     return false;
   }, [availableXp]);
 
   const refundXp = useCallback((amount: number) => {
-    setSpentXp(prev => Math.max(0, prev - amount));
+    setSpentXp(prev => {
+      const next = Math.max(0, prev - amount);
+      localStorage.setItem('nexus_spent_xp', next.toString());
+      return next;
+    });
   }, []);
 
   return (
@@ -641,6 +774,7 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
       unlocked,
       progressData,
       totalXp,
+      bonusXp,
       gamePoints,
       gamesPlayed: effectiveGamesPlayed,
       totalScore,
@@ -656,6 +790,10 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
       addGameTimePoints,
       spendGamePoints,
       addGamePoints,
+      setCustomPoints,
+      addBonusXp,
+      setCustomXp,
+      flushSave,
       availableXp,
       spentXp,
       spendXp,

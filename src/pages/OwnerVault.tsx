@@ -27,7 +27,9 @@ import {
   Play,
   Database,
   Gauge,
-  Rocket
+  Rocket,
+  AlertTriangle,
+  UserCheck
 } from 'lucide-react';
 
 // Web Audio Synthesis Helper for Retro 8-bit Sounds
@@ -90,9 +92,24 @@ const playRetroSound = (type: 'coin' | 'laser' | 'levelup' | 'win' | 'powerup') 
 };
 
 export const OwnerVault: React.FC = () => {
-  const { isOwner, user, signIn } = useAuth();
+  const { isOwner, user, signIn, unlockOwner, unlockAllAvatars } = useAuth();
   const { settings, updateSetting } = useSettings();
-  const { unlockAchievement, unlockAllAchievements } = useAchievements();
+  const { 
+    unlockAchievement, 
+    unlockAllAchievements, 
+    wipeAllProgress,
+    addGamePoints, 
+    setCustomPoints, 
+    addBonusXp, 
+    setCustomXp, 
+    gamePoints, 
+    totalXp, 
+    totalScore, 
+    level, 
+    levelTitle, 
+    gamesPlayed,
+    flushSave 
+  } = useAchievements();
 
   useEffect(() => {
     if (isOwner) {
@@ -101,6 +118,72 @@ export const OwnerVault: React.FC = () => {
   }, [isOwner]);
 
   const [activeTab, setActiveTab] = useState<'hacks' | 'injector' | 'command' | 'broadcast'>('hacks');
+
+  // Admin Abuse & Injections state
+  const [customPointsInput, setCustomPointsInput] = useState<string>('5000');
+  const [customXpInput, setCustomXpInput] = useState<string>('5000');
+  const [actionToast, setActionToast] = useState<string>('');
+
+  const showActionToast = (msg: string) => {
+    setActionToast(msg);
+    setTimeout(() => setActionToast(''), 4500);
+  };
+
+  const handleAddPoints = async (amt: number) => {
+    addGamePoints(amt);
+    playRetroSound('coin');
+    showActionToast(`💰 Injected +${amt.toLocaleString()} Game Points! Saved.`);
+    await flushSave();
+  };
+
+  const handleSetPoints = async (amt: number) => {
+    setCustomPoints(amt);
+    playRetroSound('powerup');
+    showActionToast(`⚡ Game Points set directly to ${amt.toLocaleString()} Pts! Saved.`);
+    await flushSave();
+  };
+
+  const handleAddXp = async (amt: number) => {
+    addBonusXp(amt);
+    playRetroSound('levelup');
+    showActionToast(`⭐ Injected +${amt.toLocaleString()} Trophy XP! Saved.`);
+    await flushSave();
+  };
+
+  const handleSetXp = async (amt: number) => {
+    setCustomXp(amt);
+    playRetroSound('powerup');
+    showActionToast(`🌟 Trophy XP set directly to ${amt.toLocaleString()} XP! Saved.`);
+    await flushSave();
+  };
+
+  const handleUnlockAllAvatars = async () => {
+    unlockAllAvatars();
+    playRetroSound('win');
+    showActionToast(`👑 Master Unlocked all 15+ Custom Avatars & Cosmic Skins!`);
+    await flushSave();
+  };
+
+  const handleUnlockAllAch = async () => {
+    unlockAllAchievements();
+    playRetroSound('win');
+    showActionToast(`🏆 Master Unlocked all Achievements & Trophies with Full XP!`);
+    await flushSave();
+  };
+
+  const handleWipe = async () => {
+    if (window.confirm('⚠️ Are you sure you want to reset all progress, points, and achievements back to 0 for testing?')) {
+      await wipeAllProgress();
+      playRetroSound('laser');
+      showActionToast(`🧹 All stats and progress wiped back to initial state.`);
+    }
+  };
+
+  const handleForceSync = async () => {
+    await flushSave();
+    playRetroSound('coin');
+    showActionToast(`☁️ State forcefully saved to Firestore database & local cache!`);
+  };
 
   // Party trigger & Telemetry state
   const [partyTriggerSuccess, setPartyTriggerSuccess] = useState('');
@@ -356,6 +439,20 @@ export const OwnerVault: React.FC = () => {
             Sign in as c65043679@gmail.com
           </button>
 
+          <div className="pt-2 border-t border-white/10 space-y-2">
+            <p className="text-[11px] text-slate-400">Or use instant owner clearance bypass:</p>
+            <button
+              onClick={() => {
+                unlockOwner();
+                playRetroSound('levelup');
+              }}
+              className="w-full py-3 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 font-bold text-xs rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer shadow-lg"
+            >
+              <Zap className="w-4 h-4 text-amber-400" />
+              ⚡ One-Click Owner Overlord Unlock
+            </button>
+          </div>
+
           <p className="text-[10px] text-slate-600 uppercase tracking-widest font-mono">
             Nexus Security Clearance Level 10 Required
           </p>
@@ -401,7 +498,7 @@ export const OwnerVault: React.FC = () => {
       {/* Navigation Tabs */}
       <div className="flex items-center gap-2 border-b border-white/10 pb-4 overflow-x-auto no-scrollbar">
         {[
-          { id: 'hacks', label: 'God Mode Hacks', icon: Zap },
+          { id: 'hacks', label: '⚡ Admin Abuse & God Mode', icon: Zap },
           { id: 'injector', label: 'Custom Game Injector', icon: PlusCircle },
           { id: 'command', label: 'Live Command HUD & Fireworks', icon: Rocket },
           { id: 'broadcast', label: 'Site Broadcast Banner', icon: Radio },
@@ -428,120 +525,351 @@ export const OwnerVault: React.FC = () => {
         })}
       </div>
 
-      {/* TAB CONTENT 1: God Mode Hacks */}
+      {/* Action Toast Notification */}
+      <AnimatePresence>
+        {actionToast && (
+          <motion.div
+            initial={{ opacity: 0, y: -10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+            className="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 text-black font-black px-6 py-3 rounded-2xl shadow-xl shadow-amber-500/30 flex items-center justify-between gap-3 text-xs sm:text-sm"
+          >
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 shrink-0" />
+              <span>{actionToast}</span>
+            </div>
+            <button
+              onClick={() => setActionToast('')}
+              className="text-black/70 hover:text-black font-mono font-bold text-xs cursor-pointer ml-4"
+            >
+              ✕
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* TAB CONTENT 1: Admin Abuse & God Mode */}
       {activeTab === 'hacks' && (
         <motion.div 
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="grid grid-cols-1 md:grid-cols-2 gap-8"
+          className="space-y-8"
         >
-          {/* Audio Soundboard */}
-          <div className="bg-white/5 border border-white/10 rounded-3xl p-6 space-y-5 backdrop-blur-xl">
-            <div className="flex items-center gap-3 border-b border-white/10 pb-4">
-              <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
-                <Volume2 className="w-5 h-5" />
-              </div>
+          {/* Live Overlord Status HUD */}
+          <div className="bg-gradient-to-r from-slate-900/90 via-black/80 to-slate-900/90 border border-amber-500/30 rounded-3xl p-6 backdrop-blur-xl shadow-2xl relative overflow-hidden">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
               <div>
-                <h3 className="text-base font-bold text-white">Owner 8-Bit Retro Soundboard</h3>
-                <p className="text-xs text-slate-400">Trigger arcade audio synthesizer effects live</p>
+                <div className="flex items-center gap-2 text-amber-400 text-xs font-mono font-black uppercase tracking-wider mb-1">
+                  <Activity className="w-4 h-4" />
+                  Live Overlord Profile Telemetry
+                </div>
+                <h2 className="text-xl sm:text-2xl font-black text-white flex items-center gap-3">
+                  <span>Level {level}</span>
+                  <span className="text-amber-400 text-base font-bold px-3 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30">
+                    {levelTitle}
+                  </span>
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  All stat injections instantly sync to Firestore cloud storage and browser local cache.
+                </p>
               </div>
-            </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {[
-                { name: 'Coin Pickup', type: 'coin' as const, color: 'hover:border-yellow-400' },
-                { name: 'Laser Cannon', type: 'laser' as const, color: 'hover:border-red-400' },
-                { name: 'Level Up Fanfare', type: 'levelup' as const, color: 'hover:border-emerald-400' },
-                { name: 'Victory Tune', type: 'win' as const, color: 'hover:border-purple-400' },
-                { name: 'Power Up Surge', type: 'powerup' as const, color: 'hover:border-sky-400' },
-              ].map((s) => (
-                <button
-                  key={s.name}
-                  onClick={() => playRetroSound(s.type)}
-                  className={`p-3.5 bg-black/40 border border-white/10 rounded-2xl text-xs font-bold text-slate-300 hover:text-white hover:bg-white/10 transition-all flex flex-col items-center gap-2 ${s.color} active:scale-95`}
-                >
-                  <Sparkles className="w-4 h-4 text-amber-400" />
-                  <span>{s.name}</span>
-                </button>
-              ))}
+              {/* Stats Bar */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="bg-white/5 border border-white/10 p-3.5 rounded-2xl text-center">
+                  <p className="text-[10px] text-slate-400 uppercase tracking-wider font-mono">Game Points</p>
+                  <p className="text-lg font-black font-mono text-amber-400">+{gamePoints.toLocaleString()}</p>
+                </div>
+                <div className="bg-white/5 border border-white/10 p-3.5 rounded-2xl text-center">
+                  <p className="text-[10px] text-slate-400 uppercase tracking-wider font-mono">Trophy XP</p>
+                  <p className="text-lg font-black font-mono text-emerald-400">+{totalXp.toLocaleString()}</p>
+                </div>
+                <div className="bg-white/5 border border-white/10 p-3.5 rounded-2xl text-center">
+                  <p className="text-[10px] text-slate-400 uppercase tracking-wider font-mono">Leaderboard Score</p>
+                  <p className="text-lg font-black font-mono text-purple-400">{totalScore.toLocaleString()}</p>
+                </div>
+                <div className="bg-white/5 border border-white/10 p-3.5 rounded-2xl text-center flex flex-col justify-center items-center">
+                  <button
+                    onClick={handleForceSync}
+                    className="w-full h-full py-1.5 px-2.5 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    Force Cloud Sync
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Visual Hacks */}
-          <div className="bg-white/5 border border-white/10 rounded-3xl p-6 space-y-5 backdrop-blur-xl">
-            <div className="flex items-center gap-3 border-b border-white/10 pb-4">
-              <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
-                <Terminal className="w-5 h-5" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* 1. Points Abuse Deck */}
+            <div className="bg-white/5 border border-white/10 rounded-3xl p-6 space-y-5 backdrop-blur-xl">
+              <div className="flex items-center gap-3 border-b border-white/10 pb-4">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                  <Zap className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Points Abuse & Currency Injections</h3>
+                  <p className="text-xs text-slate-400">Instantly grant game points for shop & crate unboxings</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-base font-bold text-white">Visual Engine Toggles</h3>
-                <p className="text-xs text-slate-400">Custom shaders and golden owner aura</p>
+
+              {/* Quick Preset Buttons */}
+              <div className="grid grid-cols-2 gap-2.5">
+                {[
+                  { label: '+1,000 Points', amount: 1000 },
+                  { label: '+10,000 Points', amount: 10000 },
+                  { label: '+50,000 Points', amount: 50000 },
+                  { label: 'Set 999,999 (Max)', isSet: true, amount: 999999 },
+                ].map((btn) => (
+                  <button
+                    key={btn.label}
+                    onClick={() => btn.isSet ? handleSetPoints(btn.amount) : handleAddPoints(btn.amount)}
+                    className="py-3 px-4 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-bold font-mono text-xs rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    {btn.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Custom Points Injection Form */}
+              <div className="pt-2 border-t border-white/10 space-y-2">
+                <p className="text-xs text-slate-400 font-medium">Custom Points Injection:</p>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    min="1"
+                    value={customPointsInput}
+                    onChange={(e) => setCustomPointsInput(e.target.value)}
+                    placeholder="Enter amount (e.g. 25000)"
+                    className="flex-1 bg-black/60 border border-white/15 rounded-2xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 font-mono"
+                  />
+                  <button
+                    onClick={() => {
+                      const val = parseInt(customPointsInput, 10);
+                      if (val > 0) handleAddPoints(val);
+                    }}
+                    className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-black font-black text-xs rounded-2xl transition-all active:scale-95 cursor-pointer shadow-md"
+                  >
+                    Inject Points
+                  </button>
+                </div>
               </div>
             </div>
 
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 rounded-2xl bg-black/40 border border-white/5">
-                <div>
-                  <p className="text-sm font-bold text-white flex items-center gap-2">
-                    <Flame className="w-4 h-4 text-amber-400" />
-                    God Mode Golden Aura
-                  </p>
-                  <p className="text-xs text-slate-400">Add a glowing golden aura frame to game players</p>
+            {/* 2. XP Abuse Deck */}
+            <div className="bg-white/5 border border-white/10 rounded-3xl p-6 space-y-5 backdrop-blur-xl">
+              <div className="flex items-center gap-3 border-b border-white/10 pb-4">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                  <Sparkles className="w-5 h-5" />
                 </div>
-                <button
-                  onClick={toggleGodModeAura}
-                  className={`w-12 h-6 rounded-full relative transition-colors ${
-                    godModeAura ? 'bg-amber-500' : 'bg-slate-800'
-                  }`}
-                >
-                  <div className={`w-4 h-4 rounded-full bg-white transition-all absolute top-1 ${
-                    godModeAura ? 'right-1' : 'left-1'
-                  }`} />
-                </button>
+                <div>
+                  <h3 className="text-base font-bold text-white">XP Abuse & Level Acceleration</h3>
+                  <p className="text-xs text-slate-400">Supercharge level rank, titles, and profile standing</p>
+                </div>
               </div>
 
-              <div className="flex items-center justify-between p-4 rounded-2xl bg-black/40 border border-white/5">
-                <div>
-                  <p className="text-sm font-bold text-white flex items-center gap-2">
-                    <Tv className="w-4 h-4 text-emerald-400" />
-                    Matrix Green Code Background
-                  </p>
-                  <p className="text-xs text-slate-400">Display matrix digital code stream on background</p>
+              {/* Quick Preset Buttons */}
+              <div className="grid grid-cols-2 gap-2.5">
+                {[
+                  { label: '+1,000 XP', amount: 1000 },
+                  { label: '+5,000 XP', amount: 5000 },
+                  { label: '+25,000 XP', amount: 25000 },
+                  { label: 'Level 100 God (250k)', isSet: true, amount: 250000 },
+                ].map((btn) => (
+                  <button
+                    key={btn.label}
+                    onClick={() => btn.isSet ? handleSetXp(btn.amount) : handleAddXp(btn.amount)}
+                    className="py-3 px-4 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 font-bold font-mono text-xs rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                  >
+                    <Crown className="w-3.5 h-3.5 text-emerald-400" />
+                    {btn.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Custom XP Injection Form */}
+              <div className="pt-2 border-t border-white/10 space-y-2">
+                <p className="text-xs text-slate-400 font-medium">Custom Trophy XP Injection:</p>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    min="1"
+                    value={customXpInput}
+                    onChange={(e) => setCustomXpInput(e.target.value)}
+                    placeholder="Enter XP (e.g. 15000)"
+                    className="flex-1 bg-black/60 border border-white/15 rounded-2xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400 font-mono"
+                  />
+                  <button
+                    onClick={() => {
+                      const val = parseInt(customXpInput, 10);
+                      if (val > 0) handleAddXp(val);
+                    }}
+                    className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-black font-black text-xs rounded-2xl transition-all active:scale-95 cursor-pointer shadow-md"
+                  >
+                    Inject XP
+                  </button>
                 </div>
-                <button
-                  onClick={toggleMatrixRain}
-                  className={`w-12 h-6 rounded-full relative transition-colors ${
-                    matrixRain ? 'bg-emerald-500' : 'bg-slate-800'
-                  }`}
-                >
-                  <div className={`w-4 h-4 rounded-full bg-white transition-all absolute top-1 ${
-                    matrixRain ? 'right-1' : 'left-1'
-                  }`} />
-                </button>
               </div>
             </div>
 
-            {/* Achievement Master Override Card */}
-            <div className="bg-gradient-to-r from-amber-500/15 via-yellow-500/10 to-amber-500/15 border border-amber-500/30 rounded-3xl p-6 backdrop-blur-xl md:col-span-2 space-y-4">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-amber-400 text-black flex items-center justify-center font-bold shrink-0 shadow-md shadow-amber-400/30">
-                    <Crown className="w-5 h-5" />
-                  </div>
+            {/* 3. Master Cosmetic & Trophy Overrides */}
+            <div className="bg-gradient-to-r from-amber-500/10 via-yellow-500/5 to-purple-500/10 border border-amber-500/30 rounded-3xl p-6 backdrop-blur-xl md:col-span-2 space-y-5">
+              <div className="flex items-center gap-3 border-b border-white/10 pb-4">
+                <div className="w-10 h-10 rounded-2xl bg-amber-400 text-black flex items-center justify-center font-bold shrink-0 shadow-md shadow-amber-400/30">
+                  <Crown className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Master Cosmetic & Achievement Overrides</h3>
+                  <p className="text-xs text-slate-300">Grant full access to every badge, avatar skin, and crate item on the site</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {/* Unlock All Avatars */}
+                <div className="bg-black/50 border border-white/10 rounded-2xl p-4 flex flex-col justify-between space-y-3">
                   <div>
-                    <h3 className="text-base font-bold text-white">Achievement & XP Master Override</h3>
-                    <p className="text-xs text-amber-200/80">Instantly grant 100% complete achievement trophies and max level XP to your owner profile</p>
+                    <p className="text-sm font-bold text-white flex items-center gap-2">
+                      <UserCheck className="w-4 h-4 text-purple-400" />
+                      All 15+ Custom Avatars
+                    </p>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Unlock every single cosmetic avatar profile frame including the Sovereign Crown.
+                    </p>
                   </div>
+                  <button
+                    onClick={handleUnlockAllAvatars}
+                    className="w-full py-2.5 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-300 font-black text-xs rounded-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" /> Unlock All Avatars
+                  </button>
                 </div>
-                <button
-                  onClick={() => {
-                    unlockAllAchievements();
-                    playRetroSound('win');
-                  }}
-                  className="px-6 py-3 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:from-amber-400 hover:to-yellow-300 text-black font-black text-xs uppercase tracking-wider rounded-2xl shadow-xl shadow-amber-500/25 transition-all active:scale-95 cursor-pointer flex items-center gap-2 whitespace-nowrap"
-                >
-                  <Sparkles className="w-4 h-4" /> Unlock All Achievements
-                </button>
+
+                {/* Unlock All Achievements */}
+                <div className="bg-black/50 border border-white/10 rounded-2xl p-4 flex flex-col justify-between space-y-3">
+                  <div>
+                    <p className="text-sm font-bold text-white flex items-center gap-2">
+                      <Crown className="w-4 h-4 text-amber-400" />
+                      All 24+ Achievements
+                    </p>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Instantly grant 100% completed trophies, secret achievements, and catalog badges.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleUnlockAllAch}
+                    className="w-full py-2.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 font-black text-xs rounded-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" /> Unlock All Badges
+                  </button>
+                </div>
+
+                {/* Wipe / Reset Progress */}
+                <div className="bg-black/50 border border-red-500/20 rounded-2xl p-4 flex flex-col justify-between space-y-3">
+                  <div>
+                    <p className="text-sm font-bold text-white flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-red-400" />
+                      Reset Stats to Zero
+                    </p>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Cleanly wipe points, XP, and achievements back to initial state for testing.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleWipe}
+                    className="w-full py-2.5 bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-300 font-bold text-xs rounded-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> Wipe Progress
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* 4. Audio Soundboard */}
+            <div className="bg-white/5 border border-white/10 rounded-3xl p-6 space-y-5 backdrop-blur-xl">
+              <div className="flex items-center gap-3 border-b border-white/10 pb-4">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                  <Volume2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Owner 8-Bit Retro Soundboard</h3>
+                  <p className="text-xs text-slate-400">Trigger arcade audio synthesizer effects live</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {[
+                  { name: 'Coin Pickup', type: 'coin' as const, color: 'hover:border-yellow-400' },
+                  { name: 'Laser Cannon', type: 'laser' as const, color: 'hover:border-red-400' },
+                  { name: 'Level Up Fanfare', type: 'levelup' as const, color: 'hover:border-emerald-400' },
+                  { name: 'Victory Tune', type: 'win' as const, color: 'hover:border-purple-400' },
+                  { name: 'Power Up Surge', type: 'powerup' as const, color: 'hover:border-sky-400' },
+                ].map((s) => (
+                  <button
+                    key={s.name}
+                    onClick={() => playRetroSound(s.type)}
+                    className={`p-3.5 bg-black/40 border border-white/10 rounded-2xl text-xs font-bold text-slate-300 hover:text-white hover:bg-white/10 transition-all flex flex-col items-center gap-2 ${s.color} active:scale-95 cursor-pointer`}
+                  >
+                    <Sparkles className="w-4 h-4 text-amber-400" />
+                    <span>{s.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 5. Visual Hacks */}
+            <div className="bg-white/5 border border-white/10 rounded-3xl p-6 space-y-5 backdrop-blur-xl">
+              <div className="flex items-center gap-3 border-b border-white/10 pb-4">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                  <Terminal className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Visual Engine Toggles</h3>
+                  <p className="text-xs text-slate-400">Custom shaders and golden owner aura</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 rounded-2xl bg-black/40 border border-white/5">
+                  <div>
+                    <p className="text-sm font-bold text-white flex items-center gap-2">
+                      <Flame className="w-4 h-4 text-amber-400" />
+                      God Mode Golden Aura
+                    </p>
+                    <p className="text-xs text-slate-400">Add a glowing golden aura frame to game players</p>
+                  </div>
+                  <button
+                    onClick={toggleGodModeAura}
+                    className={`w-12 h-6 rounded-full relative transition-colors cursor-pointer ${
+                      godModeAura ? 'bg-amber-500' : 'bg-slate-800'
+                    }`}
+                  >
+                    <div className={`w-4 h-4 rounded-full bg-white transition-all absolute top-1 ${
+                      godModeAura ? 'right-1' : 'left-1'
+                    }`} />
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between p-4 rounded-2xl bg-black/40 border border-white/5">
+                  <div>
+                    <p className="text-sm font-bold text-white flex items-center gap-2">
+                      <Tv className="w-4 h-4 text-emerald-400" />
+                      Matrix Green Code Background
+                    </p>
+                    <p className="text-xs text-slate-400">Display matrix digital code stream on background</p>
+                  </div>
+                  <button
+                    onClick={toggleMatrixRain}
+                    className={`w-12 h-6 rounded-full relative transition-colors cursor-pointer ${
+                      matrixRain ? 'bg-emerald-500' : 'bg-slate-800'
+                    }`}
+                  >
+                    <div className={`w-4 h-4 rounded-full bg-white transition-all absolute top-1 ${
+                      matrixRain ? 'right-1' : 'left-1'
+                    }`} />
+                  </button>
+                </div>
               </div>
             </div>
           </div>

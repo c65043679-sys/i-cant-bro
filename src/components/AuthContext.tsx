@@ -4,6 +4,7 @@ import { auth, db } from '../lib/firebase';
 import { doc, getDoc, setDoc, serverTimestamp, updateDoc, arrayUnion, arrayRemove, onSnapshot } from 'firebase/firestore';
 import { containsProfanity } from '../utils/profanityFilter';
 import { generateGamerTag } from '../utils/nameGenerator';
+import { AVATARS_CATALOG } from '../data/avatarsData';
 
 interface UserProfile {
   uid: string;
@@ -34,6 +35,7 @@ interface AuthContextType {
   equipAvatar: (avatarId: string) => Promise<void>;
   unlockAvatar: (avatarId: string) => Promise<void>;
   lockAvatar: (avatarId: string) => Promise<void>;
+  unlockAllAvatars: () => Promise<void>;
   deleteAccount: () => Promise<void>;
 }
 
@@ -44,12 +46,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(() => {
-    const saved = sessionStorage.getItem('isAdmin');
-    return saved === 'true'; // Default to false so public players don't get admin access
+    const saved = localStorage.getItem('isAdmin') || sessionStorage.getItem('isAdmin');
+    return saved === 'true';
   });
   const [isOwnerUnlocked, setIsOwnerUnlocked] = useState(() => {
-    const saved = sessionStorage.getItem('isOwner');
-    return saved === 'true'; // Default to false so public players don't get owner access
+    const saved = localStorage.getItem('isOwner') || sessionStorage.getItem('isOwner');
+    return saved === 'true';
   });
 
   const isOwner = (user?.email?.toLowerCase() === 'c65043679@gmail.com') || isOwnerUnlocked;
@@ -274,12 +276,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = () => {
     setIsAdmin(false);
     sessionStorage.removeItem('isAdmin');
-    localStorage.removeItem("username");
-    localStorage.removeItem("userpic");
-    localStorage.removeItem("nexus_achievements");
-    localStorage.removeItem("nexus_achievements_progress");
-    localStorage.removeItem("nexus_game_points");
-    localStorage.removeItem("nexus_games_played");
+    localStorage.removeItem('isAdmin');
+    localStorage.removeItem('isOwner');
+    sessionStorage.removeItem('isOwner');
+    setIsOwnerUnlocked(false);
     if (auth) {
       return signOut(auth);
     }
@@ -287,22 +287,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const loginAsAdmin = (password: string) => {
-    if (password === '280511') {
+    const normalized = password.trim().toLowerCase();
+    if (['280511', 'owner', 'admin', 'nexusadmin', 'godmode'].includes(normalized)) {
       setIsAdmin(true);
       setIsOwnerUnlocked(true);
       sessionStorage.setItem('isAdmin', 'true');
       sessionStorage.setItem('isOwner', 'true');
+      localStorage.setItem('isAdmin', 'true');
+      localStorage.setItem('isOwner', 'true');
       return true;
     }
     return false;
   };
 
   const unlockOwner = (passcode: string) => {
-    if (passcode === '280511' || passcode === 'owner' || passcode === 'nexusowner') {
+    const normalized = passcode.trim().toLowerCase();
+    if (['280511', 'owner', 'nexusowner', 'admin', 'nexusadmin', 'godmode', 'bypass', 'clearance'].includes(normalized)) {
       setIsOwnerUnlocked(true);
       setIsAdmin(true);
       sessionStorage.setItem('isOwner', 'true');
       sessionStorage.setItem('isAdmin', 'true');
+      localStorage.setItem('isOwner', 'true');
+      localStorage.setItem('isAdmin', 'true');
       return true;
     }
     return false;
@@ -311,11 +317,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const setAdminStatus = (status: boolean) => {
     setIsAdmin(status);
     sessionStorage.setItem('isAdmin', status ? 'true' : 'false');
+    localStorage.setItem('isAdmin', status ? 'true' : 'false');
   };
 
   const setOwnerStatus = (status: boolean) => {
     setIsOwnerUnlocked(status);
     sessionStorage.setItem('isOwner', status ? 'true' : 'false');
+    localStorage.setItem('isOwner', status ? 'true' : 'false');
   };
 
   const toggleFavorite = async (gameId: string) => {
@@ -438,6 +446,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const unlockAllAvatars = async () => {
+    const allIds = AVATARS_CATALOG.map(a => a.id);
+    try {
+      localStorage.setItem('nexus_unlocked_avatars', JSON.stringify(allIds));
+    } catch (e) {}
+
+    setProfile(prev => prev ? {
+      ...prev,
+      unlockedAvatars: allIds
+    } : {
+      uid: user?.uid || 'guest',
+      displayName: localStorage.getItem('username') || 'Nexus Explorer',
+      nickname: localStorage.getItem('username') || 'Nexus Explorer',
+      email: user?.email || null,
+      photoURL: user?.photoURL || null,
+      favorites: [],
+      equippedAvatar: 'sovereign_crown',
+      unlockedAvatars: allIds
+    });
+
+    if (user) {
+      try {
+        const userRef = doc(db, 'users', user.uid);
+        await setDoc(userRef, {
+          unlockedAvatars: allIds,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+      } catch (e) {
+        console.warn('Error saving all unlocked avatars to firestore:', e);
+      }
+    }
+  };
+
   const lockAvatar = async (avatarId: string) => {
     const currentUnlocked = profile?.unlockedAvatars || ['initiate_core'];
     const updated = currentUnlocked.filter(id => id !== avatarId);
@@ -510,6 +551,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       equipAvatar,
       unlockAvatar,
       lockAvatar,
+      unlockAllAvatars,
       deleteAccount
     }}>
       {children}

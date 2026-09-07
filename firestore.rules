@@ -23,11 +23,11 @@ service cloud.firestore {
       allow create, update, delete: if isOwner(uid) || isSiteAdmin();
       
       match /saves/{gameId} {
-        allow read, write: if isOwner(uid);
+        allow read, write: if isOwner(uid) || isSiteAdmin();
       }
 
-      match /data/achievements {
-        allow read, write: if isOwner(uid);
+      match /data/{docId} {
+        allow read, write: if isOwner(uid) || isSiteAdmin();
       }
     }
 
