@@ -10,35 +10,88 @@ export const BroadcastBanner: React.FC = () => {
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
-    let unsubscribe: (() => void) | null = null;
-    try {
-      unsubscribe = onSnapshot(doc(db, 'config', 'broadcast'), (snapshot) => {
-        if (snapshot.exists()) {
-          const data = snapshot.data();
-          const msg = data.message || '';
-          setAnnouncement(msg);
-          if (msg) setDismissed(false);
-          localStorage.setItem('nexus_site_announcement', msg);
-        } else {
-          setAnnouncement('');
-          localStorage.removeItem('nexus_site_announcement');
-        }
-      }, (error) => {
-        console.warn('Broadcast listener offline or restricted, falling back to local storage:', error);
-      });
-    } catch (err) {
-      console.error('Failed to initialize broadcast listener:', err);
-    }
+    let unsubscribeFirestore: (() => void) | null = null;
+    let eventSource: EventSource | null = null;
+    let bc: BroadcastChannel | null = null;
 
-    const handleUpdate = () => {
-      setAnnouncement(localStorage.getItem('nexus_site_announcement') || '');
-      setDismissed(false);
+    const applyAnnouncement = (msg: string) => {
+      const clean = (msg || '').trim();
+      setAnnouncement(clean);
+      if (clean) {
+        setDismissed(false);
+        localStorage.setItem('nexus_site_announcement', clean);
+      } else {
+        localStorage.removeItem('nexus_site_announcement');
+      }
     };
 
-    window.addEventListener('nexus_announcement_updated', handleUpdate);
+    // 1. Initial fetch from server API
+    fetch('/api/broadcast')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data && typeof data.message === 'string') {
+          applyAnnouncement(data.message);
+        }
+      })
+      .catch(() => {});
+
+    // 2. Connect to Server-Sent Events (SSE) for instant push
+    try {
+      eventSource = new EventSource('/api/live-stream');
+      eventSource.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          if (payload.type === 'broadcast') {
+            applyAnnouncement(payload.data?.message || '');
+          } else if (payload.type === 'init' && payload.broadcast) {
+            applyAnnouncement(payload.broadcast.message || '');
+          }
+        } catch (e) {}
+      };
+      eventSource.onerror = () => {
+        // EventSource auto-retries connection natively
+      };
+    } catch (e) {
+      console.warn('SSE not supported or failed to connect:', e);
+    }
+
+    // 3. BroadcastChannel for instant cross-tab sync
+    try {
+      if ('BroadcastChannel' in window) {
+        bc = new BroadcastChannel('nexus_broadcast_channel');
+        bc.onmessage = (event) => {
+          if (event.data && typeof event.data.message === 'string') {
+            applyAnnouncement(event.data.message);
+          }
+        };
+      }
+    } catch (e) {}
+
+    // 4. Firestore real-time snapshot
+    try {
+      unsubscribeFirestore = onSnapshot(doc(db, 'config', 'broadcast'), (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          applyAnnouncement(data.message || '');
+        }
+      }, (err) => {
+        console.warn('Broadcast firestore listener notice:', err);
+      });
+    } catch (err) {
+      console.warn('Broadcast firestore init notice:', err);
+    }
+
+    // 5. Local custom and storage events
+    const handleLocalUpdate = () => {
+      applyAnnouncement(localStorage.getItem('nexus_site_announcement') || '');
+    };
+    window.addEventListener('nexus_announcement_updated', handleLocalUpdate);
+
     return () => {
-      if (unsubscribe) unsubscribe();
-      window.removeEventListener('nexus_announcement_updated', handleUpdate);
+      if (eventSource) eventSource.close();
+      if (bc) bc.close();
+      if (unsubscribeFirestore) unsubscribeFirestore();
+      window.removeEventListener('nexus_announcement_updated', handleLocalUpdate);
     };
   }, []);
 

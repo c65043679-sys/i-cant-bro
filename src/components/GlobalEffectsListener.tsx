@@ -8,7 +8,36 @@ export const GlobalEffectsListener: React.FC = () => {
   });
 
   useEffect(() => {
-    // 1. Listen to BroadcastChannel for instant cross-tab / proxy sync
+    // 1. Initial fetch from server API
+    fetch('/api/effects')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data && typeof data.godModeAura === 'boolean') {
+          setGodModeAura(data.godModeAura);
+          localStorage.setItem('nexus_godmode_aura', data.godModeAura ? 'true' : 'false');
+        }
+      })
+      .catch(() => {});
+
+    // 2. Server-Sent Events (SSE) for instant cross-visitor updates
+    let eventSource: EventSource | null = null;
+    try {
+      eventSource = new EventSource('/api/live-stream');
+      eventSource.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          if (payload.type === 'effects' && payload.data && typeof payload.data.godModeAura === 'boolean') {
+            setGodModeAura(payload.data.godModeAura);
+            localStorage.setItem('nexus_godmode_aura', payload.data.godModeAura ? 'true' : 'false');
+          } else if (payload.type === 'init' && payload.effects && typeof payload.effects.godModeAura === 'boolean') {
+            setGodModeAura(payload.effects.godModeAura);
+            localStorage.setItem('nexus_godmode_aura', payload.effects.godModeAura ? 'true' : 'false');
+          }
+        } catch (e) {}
+      };
+    } catch (e) {}
+
+    // 3. Listen to BroadcastChannel for instant cross-tab / proxy sync
     let bc: BroadcastChannel | null = null;
     try {
       if ('BroadcastChannel' in window) {
@@ -24,13 +53,13 @@ export const GlobalEffectsListener: React.FC = () => {
       console.warn('BroadcastChannel not supported:', e);
     }
 
-    // 2. Listen to window custom events
+    // 4. Listen to window custom events
     const handleCustomEvent = (e: CustomEvent) => {
       setGodModeAura(!!e.detail);
     };
     window.addEventListener('nexus_godmode_toggle' as any, handleCustomEvent);
 
-    // 3. Listen to localStorage storage events
+    // 5. Listen to localStorage storage events
     const handleStorage = (e: StorageEvent) => {
       if (e.key === 'nexus_godmode_aura') {
         setGodModeAura(e.newValue === 'true');
@@ -38,7 +67,7 @@ export const GlobalEffectsListener: React.FC = () => {
     };
     window.addEventListener('storage', handleStorage);
 
-    // 4. Listen to Firestore doc
+    // 6. Listen to Firestore doc
     let unsub: (() => void) | null = null;
     try {
       unsub = onSnapshot(doc(db, 'config', 'effects'), (snapshot) => {
@@ -60,6 +89,7 @@ export const GlobalEffectsListener: React.FC = () => {
     }
 
     return () => {
+      if (eventSource) eventSource.close();
       if (bc) bc.close();
       window.removeEventListener('nexus_godmode_toggle' as any, handleCustomEvent);
       window.removeEventListener('storage', handleStorage);

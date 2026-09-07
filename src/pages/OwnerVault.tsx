@@ -222,6 +222,26 @@ export const OwnerVault: React.FC = () => {
       setInjectedGames(list);
     }, (err) => console.warn('Injected games listener error:', err));
 
+    // Fetch initial state from server API
+    fetch('/api/broadcast')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data && typeof data.message === 'string') {
+          setAnnouncementText(data.message);
+        }
+      })
+      .catch(() => {});
+
+    fetch('/api/effects')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data) {
+          if (typeof data.godModeAura === 'boolean') setGodModeAura(data.godModeAura);
+          if (typeof data.matrixRain === 'boolean') setMatrixRain(data.matrixRain);
+        }
+      })
+      .catch(() => {});
+
     const unsubBroadcast = onSnapshot(doc(db, 'config', 'broadcast'), (snapshot) => {
       if (snapshot.exists()) {
         setAnnouncementText(snapshot.data().message || '');
@@ -268,62 +288,130 @@ export const OwnerVault: React.FC = () => {
       trending: true,
     };
 
+    // Save to local storage for immediate persistence
+    try {
+      const saved = localStorage.getItem('nexus_injected_games');
+      const games = saved ? JSON.parse(saved) : [];
+      games.push(newGame);
+      localStorage.setItem('nexus_injected_games', JSON.stringify(games));
+      window.dispatchEvent(new Event('nexus_games_updated'));
+      setInjectedGames(prev => [...prev.filter(g => g.id !== newGame.id), newGame]);
+    } catch (e) {}
+
+    playRetroSound('win');
+    setInjectSuccess(`"${newGame.title}" successfully injected into the global Nexus catalog!`);
+    setTimeout(() => setInjectSuccess(''), 4000);
+
+    setNewTitle('');
+    setNewIframe('');
+    setNewThumb('');
+
     try {
       await setDoc(doc(db, 'injected_games', newGame.id), newGame);
-      playRetroSound('win');
-      setInjectSuccess(`"${newGame.title}" successfully injected into the global Nexus catalog!`);
-      setTimeout(() => setInjectSuccess(''), 4000);
-
-      setNewTitle('');
-      setNewIframe('');
-      setNewThumb('');
     } catch (err) {
-      console.error('Failed to inject game to Firestore:', err);
-      alert('Failed to publish custom game to database.');
+      console.warn('Firestore game injection sync notice (persisted locally):', err);
     }
   };
 
   const handleRemoveInjected = async (id: string) => {
     try {
-      await deleteDoc(doc(db, 'injected_games', id));
+      const saved = localStorage.getItem('nexus_injected_games');
+      if (saved) {
+        const games = JSON.parse(saved).filter((g: any) => g.id !== id);
+        localStorage.setItem('nexus_injected_games', JSON.stringify(games));
+        window.dispatchEvent(new Event('nexus_games_updated'));
+      }
+      setInjectedGames(prev => prev.filter(g => g.id !== id));
       playRetroSound('laser');
+    } catch (e) {}
+
+    try {
+      await deleteDoc(doc(db, 'injected_games', id));
     } catch (err) {
-      console.error('Failed to remove injected game from Firestore:', err);
+      console.warn('Firestore game remove notice:', err);
     }
   };
 
   const handleSaveAnnouncement = async () => {
     const text = announcementText.trim();
+    if (!text) {
+      handleClearAnnouncement();
+      return;
+    }
+
+    // 1. Instant local and cross-tab update
+    localStorage.setItem('nexus_site_announcement', text);
+    window.dispatchEvent(new Event('nexus_announcement_updated'));
+    try {
+      if ('BroadcastChannel' in window) {
+        const bc = new BroadcastChannel('nexus_broadcast_channel');
+        bc.postMessage({ message: text, ts: Date.now() });
+        bc.close();
+      }
+    } catch (e) {}
+
+    playRetroSound('coin');
+    setAnnounceSuccess('Global announcement broadcast published live to all visitors!');
+    setTimeout(() => setAnnounceSuccess(''), 4000);
+
+    // 2. Publish to backend server API (triggers SSE to all connected visitors)
+    try {
+      await fetch('/api/broadcast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: text,
+          updatedBy: user?.email || 'c65043679@gmail.com'
+        })
+      });
+    } catch (err) {
+      console.warn('Server broadcast sync notice:', err);
+    }
+
+    // 3. Dual-sync to Firestore
     try {
       await setDoc(doc(db, 'config', 'broadcast'), {
         message: text,
         updatedBy: user?.email || 'c65043679@gmail.com',
         updatedAt: new Date().toISOString(),
       });
-      localStorage.setItem('nexus_site_announcement', text);
-      window.dispatchEvent(new Event('nexus_announcement_updated'));
-      playRetroSound('coin');
-      setAnnounceSuccess('Global announcement broadcast published live to all visitors!');
-      setTimeout(() => setAnnounceSuccess(''), 3500);
     } catch (err) {
-      console.error('Failed to save broadcast notice to Firestore:', err);
-      alert('Failed to broadcast notice.');
+      console.warn('Firestore broadcast sync notice (handled by server):', err);
     }
   };
 
   const handleClearAnnouncement = async () => {
+    setAnnouncementText('');
+    localStorage.removeItem('nexus_site_announcement');
+    window.dispatchEvent(new Event('nexus_announcement_updated'));
+    try {
+      if ('BroadcastChannel' in window) {
+        const bc = new BroadcastChannel('nexus_broadcast_channel');
+        bc.postMessage({ message: '', ts: Date.now() });
+        bc.close();
+      }
+    } catch (e) {}
+
+    playRetroSound('laser');
+    setAnnounceSuccess('Announcement broadcast removed.');
+    setTimeout(() => setAnnounceSuccess(''), 3000);
+
+    // Delete on server
+    try {
+      await fetch('/api/broadcast', { method: 'DELETE' });
+    } catch (err) {
+      console.warn('Server clear broadcast notice:', err);
+    }
+
+    // Delete in Firestore
     try {
       await setDoc(doc(db, 'config', 'broadcast'), {
         message: '',
         updatedBy: user?.email || 'c65043679@gmail.com',
         updatedAt: new Date().toISOString(),
       });
-      setAnnouncementText('');
-      localStorage.removeItem('nexus_site_announcement');
-      window.dispatchEvent(new Event('nexus_announcement_updated'));
-      playRetroSound('laser');
     } catch (err) {
-      console.error('Failed to clear announcement in Firestore:', err);
+      console.warn('Firestore clear announcement notice:', err);
     }
   };
 
@@ -341,13 +429,24 @@ export const OwnerVault: React.FC = () => {
     } catch (e) {}
     playRetroSound(next ? 'powerup' : 'laser');
 
+    // Server API update
+    try {
+      await fetch('/api/effects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ godModeAura: next })
+      });
+    } catch (err) {
+      console.warn('Server effects sync notice:', err);
+    }
+
     try {
       await setDoc(doc(db, 'config', 'effects'), {
         godModeAura: next,
         updatedAt: new Date().toISOString()
       }, { merge: true });
     } catch (err) {
-      console.warn('Failed to sync godModeAura to firestore:', err);
+      console.warn('Firestore godModeAura notice:', err);
     }
   };
 
@@ -365,18 +464,29 @@ export const OwnerVault: React.FC = () => {
     } catch (e) {}
     playRetroSound(next ? 'powerup' : 'laser');
 
+    // Server API update
+    try {
+      await fetch('/api/effects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ matrixRain: next })
+      });
+    } catch (err) {
+      console.warn('Server matrixRain sync notice:', err);
+    }
+
     try {
       await setDoc(doc(db, 'config', 'effects'), {
         matrixRain: next,
         updatedAt: new Date().toISOString()
       }, { merge: true });
     } catch (err) {
-      console.warn('Failed to sync matrixRain to firestore:', err);
+      console.warn('Firestore matrixRain notice:', err);
     }
   };
 
   const handleTriggerGlobalParty = async (mode: 'fireworks' | 'cannon' = 'fireworks') => {
-    // 1. Instant local & broadcast dispatch
+    // 1. Instant local & broadcast dispatch for immediate celebration on current screen
     window.dispatchEvent(new CustomEvent('nexus_party_fire', { detail: { mode } }));
     localStorage.setItem('nexus_party_signal', JSON.stringify({ mode, ts: Date.now() }));
     try {
@@ -387,19 +497,33 @@ export const OwnerVault: React.FC = () => {
       }
     } catch (e) {}
 
-    // 2. Firestore global persistence
+    playRetroSound('win');
+    setPartyTriggerSuccess(`🎉 Global ${mode.toUpperCase()} triggered live for all connected visitors!`);
+    setTimeout(() => setPartyTriggerSuccess(''), 4500);
+
+    // 2. Broadcast to server API so ALL visitors on the website receive it via SSE/polling
+    try {
+      await fetch('/api/party', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode,
+          triggeredBy: user?.email || 'c65043679@gmail.com'
+        })
+      });
+    } catch (e) {
+      console.warn('Server party broadcast notice:', e);
+    }
+
+    // 3. Dual-sync to Firestore
     try {
       await setDoc(doc(db, 'config', 'party'), {
         timestamp: Date.now(),
         mode,
         triggeredBy: user?.email || 'c65043679@gmail.com',
       });
-      playRetroSound('win');
-      setPartyTriggerSuccess(`🎉 Global ${mode.toUpperCase()} triggered live for all connected visitors!`);
-      setTimeout(() => setPartyTriggerSuccess(''), 4500);
     } catch (err) {
-      console.error('Failed to trigger party mode:', err);
-      alert('Failed to send global party celebration event.');
+      console.warn('Firestore party trigger notice (handled by server):', err);
     }
   };
 

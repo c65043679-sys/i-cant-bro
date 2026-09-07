@@ -63,6 +63,152 @@ async function startServer() {
   });
 
   const LEADERBOARD_FILE = path.join(process.cwd(), "data", "leaderboard.json");
+  const BROADCAST_FILE = path.join(process.cwd(), "data", "broadcast.json");
+  const PARTY_FILE = path.join(process.cwd(), "data", "party.json");
+  const EFFECTS_FILE = path.join(process.cwd(), "data", "effects.json");
+
+  function readJsonFile<T>(filePath: string, fallback: T): T {
+    try {
+      if (fs.existsSync(filePath)) {
+        const raw = fs.readFileSync(filePath, "utf-8");
+        return JSON.parse(raw);
+      }
+    } catch (e) {
+      console.warn(`Could not read ${filePath}:`, e);
+    }
+    return fallback;
+  }
+
+  function writeJsonFile(filePath: string, data: any) {
+    try {
+      const dir = path.dirname(filePath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
+    } catch (e) {
+      console.error(`Failed to write ${filePath}:`, e);
+    }
+  }
+
+  // Real-time Server-Sent Events (SSE) clients
+  const sseClients = new Set<express.Response>();
+
+  function sendSseEvent(type: string, data: any) {
+    const payload = `data: ${JSON.stringify({ type, data })}\n\n`;
+    for (const client of sseClients) {
+      try {
+        client.write(payload);
+      } catch (e) {
+        sseClients.delete(client);
+      }
+    }
+  }
+
+  // Periodic heartbeat every 25 seconds for proxies (Cloudflare, nginx)
+  setInterval(() => {
+    for (const client of sseClients) {
+      try {
+        client.write(": keepalive\n\n");
+      } catch (e) {
+        sseClients.delete(client);
+      }
+    }
+  }, 25000);
+
+  // GET /api/live-stream - Server-Sent Events stream for instant real-time broadcasts
+  app.get("/api/live-stream", (req, res) => {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    if (typeof (res as any).flushHeaders === "function") {
+      (res as any).flushHeaders();
+    }
+
+    const broadcast = readJsonFile(BROADCAST_FILE, { message: "", updatedAt: "", updatedBy: "" });
+    const party = readJsonFile(PARTY_FILE, { mode: "", timestamp: 0, triggeredBy: "" });
+    const effects = readJsonFile(EFFECTS_FILE, { godModeAura: false, matrixRain: false });
+
+    // Send initial state snapshot to newly connected client
+    res.write(`data: ${JSON.stringify({ type: "init", broadcast, party, effects })}\n\n`);
+
+    sseClients.add(res);
+
+    req.on("close", () => {
+      sseClients.delete(res);
+    });
+  });
+
+  // GET /api/broadcast
+  app.get("/api/broadcast", (req, res) => {
+    const data = readJsonFile(BROADCAST_FILE, { message: "", updatedAt: "", updatedBy: "" });
+    res.json(data);
+  });
+
+  // POST /api/broadcast - Publishes live announcement notice
+  app.post("/api/broadcast", (req, res) => {
+    const { message, updatedBy } = req.body || {};
+    const broadcastData = {
+      message: typeof message === "string" ? message.trim() : "",
+      updatedAt: new Date().toISOString(),
+      updatedBy: updatedBy || "c65043679@gmail.com"
+    };
+    writeJsonFile(BROADCAST_FILE, broadcastData);
+    sendSseEvent("broadcast", broadcastData);
+    res.json({ success: true, ...broadcastData });
+  });
+
+  // DELETE /api/broadcast - Clears announcement notice
+  app.delete("/api/broadcast", (req, res) => {
+    const broadcastData = {
+      message: "",
+      updatedAt: new Date().toISOString(),
+      updatedBy: "c65043679@gmail.com"
+    };
+    writeJsonFile(BROADCAST_FILE, broadcastData);
+    sendSseEvent("broadcast", broadcastData);
+    res.json({ success: true, message: "" });
+  });
+
+  // GET /api/party - Get latest celebration trigger
+  app.get("/api/party", (req, res) => {
+    const partyData = readJsonFile(PARTY_FILE, { mode: "", timestamp: 0, triggeredBy: "" });
+    res.json(partyData);
+  });
+
+  // POST /api/party - Broadcast celebration fireworks / confetti to all visitors
+  app.post("/api/party", (req, res) => {
+    const { mode, triggeredBy } = req.body || {};
+    const partyData = {
+      mode: mode === "cannon" ? "cannon" : "fireworks",
+      timestamp: Date.now(),
+      triggeredBy: triggeredBy || "c65043679@gmail.com"
+    };
+    writeJsonFile(PARTY_FILE, partyData);
+    sendSseEvent("party", partyData);
+    res.json({ success: true, ...partyData });
+  });
+
+  // GET /api/effects - Get visual shader/aura effects
+  app.get("/api/effects", (req, res) => {
+    const effectsData = readJsonFile(EFFECTS_FILE, { godModeAura: false, matrixRain: false });
+    res.json(effectsData);
+  });
+
+  // POST /api/effects - Set visual shader/aura effects
+  app.post("/api/effects", (req, res) => {
+    const current = readJsonFile(EFFECTS_FILE, { godModeAura: false, matrixRain: false });
+    const { godModeAura, matrixRain } = req.body || {};
+    const updated = {
+      godModeAura: typeof godModeAura === "boolean" ? godModeAura : current.godModeAura,
+      matrixRain: typeof matrixRain === "boolean" ? matrixRain : current.matrixRain,
+      updatedAt: new Date().toISOString()
+    };
+    writeJsonFile(EFFECTS_FILE, updated);
+    sendSseEvent("effects", updated);
+    res.json({ success: true, ...updated });
+  });
 
   function readLeaderboardData(): any[] {
     try {

@@ -8,35 +8,96 @@ export const GlobalPartyListener: React.FC = () => {
   const { unlockAchievement } = useAchievements();
 
   useEffect(() => {
-    let lastSeenTs = 0;
+    let lastSeenTs = Date.now(); // Ignore old events prior to mounting
 
     const firePartyEffects = (mode: string = 'fireworks') => {
-      if (mode === 'fireworks' || mode === 'all') {
-        const duration = 3.5 * 1000;
-        const animationEnd = Date.now() + duration;
-        const defaults = { startVelocity: 35, spread: 360, ticks: 70, zIndex: 99999 };
+      try {
+        if (mode === 'fireworks' || mode === 'all') {
+          // Instant burst right away
+          confetti({
+            particleCount: 80,
+            spread: 100,
+            origin: { x: 0.5, y: 0.4 },
+            zIndex: 999999
+          });
 
-        const interval: any = setInterval(function() {
-          const timeLeft = animationEnd - Date.now();
-          if (timeLeft <= 0) {
-            return clearInterval(interval);
-          }
-          const particleCount = 60 * (timeLeft / duration);
-          confetti({ ...defaults, particleCount, origin: { x: Math.random() * 0.4 + 0.1, y: Math.random() - 0.2 } });
-          confetti({ ...defaults, particleCount, origin: { x: Math.random() * 0.4 + 0.5, y: Math.random() - 0.2 } });
-        }, 200);
-      } else {
-        // Cannon blast
-        confetti({
-          particleCount: 150,
-          spread: 100,
-          origin: { y: 0.6 },
-          zIndex: 99999
-        });
+          const duration = 3.5 * 1000;
+          const animationEnd = Date.now() + duration;
+          const defaults = { startVelocity: 32, spread: 360, ticks: 60, zIndex: 999999 };
+
+          const interval: any = setInterval(function() {
+            const timeLeft = animationEnd - Date.now();
+            if (timeLeft <= 0) {
+              return clearInterval(interval);
+            }
+            const particleCount = 45 * (timeLeft / duration);
+            confetti({
+              ...defaults,
+              particleCount,
+              origin: { x: Math.random() * 0.3 + 0.1, y: Math.random() * 0.35 + 0.15 }
+            });
+            confetti({
+              ...defaults,
+              particleCount,
+              origin: { x: Math.random() * 0.3 + 0.6, y: Math.random() * 0.35 + 0.15 }
+            });
+          }, 250);
+        } else {
+          // High-velocity dual cannon blast
+          confetti({
+            particleCount: 120,
+            angle: 60,
+            spread: 80,
+            origin: { x: 0.05, y: 0.65 },
+            zIndex: 999999
+          });
+          confetti({
+            particleCount: 120,
+            angle: 120,
+            spread: 80,
+            origin: { x: 0.95, y: 0.65 },
+            zIndex: 999999
+          });
+          confetti({
+            particleCount: 100,
+            spread: 100,
+            origin: { x: 0.5, y: 0.55 },
+            zIndex: 999999
+          });
+        }
+      } catch (err) {
+        console.error('Confetti execution error:', err);
       }
     };
 
-    // 1. BroadcastChannel for instant local & proxy party triggering
+    const handleIncomingParty = (mode: string, ts: number) => {
+      if (ts && ts !== lastSeenTs) {
+        lastSeenTs = ts;
+        // Only trigger if happened recently (within 20s)
+        if (Date.now() - ts < 20000) {
+          firePartyEffects(mode || 'fireworks');
+          try { unlockAchievement('party_starter'); } catch (e) {}
+        }
+      }
+    };
+
+    // 1. Server-Sent Events (SSE) for instant cross-user live push
+    let eventSource: EventSource | null = null;
+    try {
+      eventSource = new EventSource('/api/live-stream');
+      eventSource.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          if (payload.type === 'party' && payload.data) {
+            handleIncomingParty(payload.data.mode, payload.data.timestamp);
+          }
+        } catch (e) {}
+      };
+    } catch (e) {
+      console.warn('SSE party stream error:', e);
+    }
+
+    // 2. BroadcastChannel for instant same-browser cross-tab sync
     let bc: BroadcastChannel | null = null;
     try {
       if ('BroadcastChannel' in window) {
@@ -48,11 +109,9 @@ export const GlobalPartyListener: React.FC = () => {
           }
         };
       }
-    } catch (e) {
-      console.warn('BroadcastChannel error:', e);
-    }
+    } catch (e) {}
 
-    // 2. Custom window event
+    // 3. Custom window event for instant local execution
     const handleCustomParty = (e: CustomEvent) => {
       const mode = e.detail?.mode || 'fireworks';
       firePartyEffects(mode);
@@ -60,7 +119,7 @@ export const GlobalPartyListener: React.FC = () => {
     };
     window.addEventListener('nexus_party_fire' as any, handleCustomParty);
 
-    // 3. Storage event
+    // 4. Storage event
     const handleStorage = (e: StorageEvent) => {
       if (e.key === 'nexus_party_signal' && e.newValue) {
         try {
@@ -74,36 +133,43 @@ export const GlobalPartyListener: React.FC = () => {
     };
     window.addEventListener('storage', handleStorage);
 
-    // 4. Firestore snapshot
-    let unsub: (() => void) | null = null;
+    // 5. Firestore real-time snapshot
+    let unsubFirestore: (() => void) | null = null;
     try {
-      unsub = onSnapshot(doc(db, 'config', 'party'), (snapshot) => {
+      unsubFirestore = onSnapshot(doc(db, 'config', 'party'), (snapshot) => {
         if (snapshot.exists()) {
           const data = snapshot.data();
           const ts = data.timestamp || 0;
-          if (ts > 0 && ts !== lastSeenTs) {
-            lastSeenTs = ts;
-            // Trigger effect if received within last 30 seconds
-            if (Date.now() - ts < 30000) {
-              firePartyEffects(data.mode);
-              try { unlockAchievement('party_starter'); } catch (e) {}
-            }
-          }
+          handleIncomingParty(data.mode, ts);
         }
       }, (err) => {
-        console.warn('Party listener offline:', err);
+        console.warn('Party firestore listener notice:', err);
       });
     } catch (e) {
-      console.error('Party listener init failed:', e);
+      console.warn('Party firestore init notice:', e);
     }
 
+    // 6. Fast polling fallback to /api/party (every 3.5s) in case SSE is blocked
+    const pollInterval = setInterval(() => {
+      fetch('/api/party')
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data && data.timestamp && data.timestamp !== lastSeenTs) {
+            handleIncomingParty(data.mode, data.timestamp);
+          }
+        })
+        .catch(() => {});
+    }, 3500);
+
     return () => {
+      if (eventSource) eventSource.close();
       if (bc) bc.close();
+      if (unsubFirestore) unsubFirestore();
+      clearInterval(pollInterval);
       window.removeEventListener('nexus_party_fire' as any, handleCustomParty);
       window.removeEventListener('storage', handleStorage);
-      if (unsub) unsub();
     };
-  }, []);
+  }, [unlockAchievement]);
 
   return null;
 };
