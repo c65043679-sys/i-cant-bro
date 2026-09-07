@@ -1,0 +1,91 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "User profile data including display name and avatar",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "email": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "displayName", "email"]
+    },
+    "GameSave": {
+      "title": "Game Save",
+      "description": "Saved game data for a specific user and game",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "gameId": { "type": "string" },
+        "data": { "type": "object" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "gameId", "data"]
+    },
+    "BroadcastNotice": {
+      "title": "Broadcast Notice",
+      "description": "Global announcement broadcast message shown on top of the site",
+      "type": "object",
+      "properties": {
+        "message": { "type": "string", "maxLength": 500 },
+        "updatedBy": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["message"]
+    },
+    "InjectedGame": {
+      "title": "Injected Game",
+      "description": "Custom game injected by the owner into the catalog",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "thumbnail": { "type": "string" },
+        "color": { "type": "string" },
+        "category": { "type": "string" },
+        "iframe": { "type": "string" },
+        "controls": { "type": "string" },
+        "rating": { "type": "number" },
+        "featured": { "type": "boolean" },
+        "trending": { "type": "boolean" }
+      },
+      "required": ["id", "title", "iframe", "category"]
+    },
+    "GlobalPartyTrigger": {
+      "title": "Global Party Trigger",
+      "description": "Realtime signal to trigger site-wide fireworks or confetti across all connected visitors",
+      "type": "object",
+      "properties": {
+        "timestamp": { "type": "number" },
+        "mode": { "type": "string" },
+        "triggeredBy": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "UserProfile",
+      "description": "Collection of user profiles"
+    },
+    "/users/{uid}/saves/{gameId}": {
+      "schema": "GameSave",
+      "description": "Subcollection for user specific game saves"
+    },
+    "/config/broadcast": {
+      "schema": "BroadcastNotice",
+      "description": "Global broadcast banner notice document"
+    },
+    "/config/party": {
+      "schema": "GlobalPartyTrigger",
+      "description": "Realtime party celebration trigger document"
+    },
+    "/injected_games/{gameId}": {
+      "schema": "InjectedGame",
+      "description": "Collection of custom games added by site owner"
+    }
+  }
+}

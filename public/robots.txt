@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://unblocked.nexusgames.dpdns.org/sitemap.xml

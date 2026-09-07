@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <!-- Background Gradient representing Nexus Games deep violet branding -->
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8b5cf6" />
+      <stop offset="50%" stop-color="#7c3aed" />
+      <stop offset="100%" stop-color="#4c1d95" />
+    </linearGradient>
+    
+    <!-- Accent Top Glow -->
+    <linearGradient id="glow" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.6" />
+      <stop offset="100%" stop-color="#c084fc" stop-opacity="0" />
+    </linearGradient>
+
+    <!-- Drop Shadow on the main 'N' for depth -->
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#000000" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Base Rounded Square Container -->
+  <rect x="0" y="0" width="128" height="128" rx="36" fill="url(#bg-grad)" />
+  
+  <!-- Subtle top-gloss light reflect -->
+  <rect x="0" y="0" width="128" height="64" rx="16" fill="url(#glow)" opacity="0.3" pointer-events="none" />
+
+  <!-- Futuristic Geometric 'N' letter -->
+  <g filter="url(#shadow)">
+    <!-- Left Column -->
+    <rect x="32" y="32" width="14" height="64" rx="3" fill="#ffffff" />
+    
+    <!-- Right Column -->
+    <rect x="82" y="32" width="14" height="64" rx="3" fill="#ffffff" />
+    
+    <!-- Sleek Diagonal Slash connecting the pillars perfectly -->
+    <polygon points="41,32 53,32 87,96 75,96" fill="#ffffff" />
+  </g>
+</svg>

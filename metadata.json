@@ -1,0 +1,14 @@
+{
+  "name": "Remix of the Remix of the original Nexus Games",
+  "description": "A modern, high-performance browser gaming platform featuring low-poly racing, arcade, and puzzle games.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation",
+    "accelerometer",
+    "gyroscope"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

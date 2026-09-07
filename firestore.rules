@@ -1,0 +1,58 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isSiteAdmin() {
+      return isSignedIn() && request.auth.token != null && request.auth.token.email != null && request.auth.token.email.lower() == 'c65043679@gmail.com';
+    }
+
+    match /users/{uid} {
+      allow read: if true;
+      allow create, update, delete: if isOwner(uid) || isSiteAdmin();
+      
+      match /saves/{gameId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      match /data/achievements {
+        allow read, write: if isOwner(uid);
+      }
+    }
+
+    // Site Broadcast Configuration (Publicly Readable, Writeable)
+    match /config/broadcast {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Site Party Celebration Trigger (Publicly Readable, Writeable)
+    match /config/party {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Site Global Visual Engine Shaders & Aura Effects (Publicly Readable, Writeable)
+    match /config/effects {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Owner Injected Games (Publicly Readable, Writeable)
+    match /injected_games/{gameId} {
+      allow read: if true;
+      allow write: if true;
+    }
+  }
+}
