@@ -493,6 +493,30 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
     } catch (err) {
       console.warn('Error in flushSave:', err);
     }
+
+    // Sync to shared server leaderboard API so other website users immediately see progress (owner is permanently excluded)
+    const isOwnerUser = (user.email?.toLowerCase() === 'c65043679@gmail.com') || (sessionStorage.getItem('isOwner') === 'true') || activeUName === 'Gordon Freeman';
+    if (!isOwnerUser) {
+      try {
+        fetch('/api/leaderboard', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            uid: user.uid,
+            email: user.email,
+            photoURL: user.photoURL || localStorage.getItem('userpic') || null,
+            displayName: activeUName,
+            totalScore: totalScoreVal,
+            achievementXp: currentXp,
+            gamePoints: effectiveGp,
+            gamesPlayed: effectiveGamesPlayedCount,
+            achievementsCount: isPZ ? 0 : Object.keys(unlockedRef.current).length,
+            title: currentLevelTitle,
+            isOwner: false
+          })
+        }).catch(() => {});
+      } catch (e) {}
+    }
   }, [user, profile, gamePoints, gamesPlayed, bonusXp, spentXp]);
 
   // Sync to localStorage on every change and debounce Firestore save (800ms)

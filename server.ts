@@ -54,9 +54,155 @@ async function startServer() {
     next();
   });
 
+  // Body parser for API endpoints
+  app.use(express.json());
+
   // Healthcheck endpoint
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
+  });
+
+  const LEADERBOARD_FILE = path.join(process.cwd(), "data", "leaderboard.json");
+
+  function readLeaderboardData(): any[] {
+    try {
+      if (fs.existsSync(LEADERBOARD_FILE)) {
+        const raw = fs.readFileSync(LEADERBOARD_FILE, "utf-8");
+        return JSON.parse(raw);
+      }
+    } catch (e) {
+      console.warn("Could not read leaderboard file:", e);
+    }
+    return [];
+  }
+
+  function writeLeaderboardData(data: any[]) {
+    try {
+      const dir = path.dirname(LEADERBOARD_FILE);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      fs.writeFileSync(LEADERBOARD_FILE, JSON.stringify(data, null, 2), "utf-8");
+    } catch (e) {
+      console.error("Failed to write leaderboard data:", e);
+    }
+  }
+
+  // GET /api/leaderboard - Returns real registered website users only (owner permanently excluded)
+  app.get("/api/leaderboard", (req, res) => {
+    const rawPlayers = readLeaderboardData();
+    const players = rawPlayers.filter(
+      (p: any) =>
+        !p.isOwner &&
+        (!p.email || p.email.toLowerCase() !== "c65043679@gmail.com") &&
+        p.displayName !== "Gordon Freeman"
+    );
+    res.json({ players });
+  });
+
+  // POST /api/leaderboard - Upserts real players (owner is permanently excluded from competition standings)
+  app.post("/api/leaderboard", (req, res) => {
+    const body = req.body;
+    if (!body || !body.uid) {
+      return res.status(400).json({ error: "Missing uid in request body" });
+    }
+
+    const currentPlayers = readLeaderboardData();
+    const isOwner =
+      (body.email && body.email.toLowerCase() === "c65043679@gmail.com") ||
+      body.isOwner === true ||
+      body.displayName === "Gordon Freeman";
+
+    if (isOwner) {
+      // Owner is permanently excluded from competition standings
+      const purged = currentPlayers.filter(
+        (p: any) =>
+          !p.isOwner &&
+          (!p.email || p.email.toLowerCase() !== "c65043679@gmail.com") &&
+          p.displayName !== "Gordon Freeman"
+      );
+      if (purged.length !== currentPlayers.length) {
+        writeLeaderboardData(purged);
+      }
+      return res.json({
+        success: true,
+        isOwner: true,
+        excluded: true,
+        message: "Owner account is permanently hidden from leaderboard competition",
+        players: purged
+      });
+    }
+
+    const finalName = body.displayName || "Combine Soldier";
+    const isPoisonZombie =
+      finalName.toLowerCase().trim() === "poison zombie" ||
+      finalName.toLowerCase().trim() === "poision zombie";
+
+    const totalScore = isPoisonZombie
+      ? 5000
+      : typeof body.totalScore === "number"
+      ? body.totalScore
+      : (body.achievementXp || 0) + (body.gamePoints || 0);
+    const gamePoints = isPoisonZombie
+      ? 1000
+      : typeof body.gamePoints === "number"
+      ? body.gamePoints
+      : 0;
+    const achievementXp = isPoisonZombie
+      ? 4000
+      : typeof body.achievementXp === "number"
+      ? body.achievementXp
+      : 0;
+    const gamesPlayed = isPoisonZombie
+      ? 0
+      : typeof body.gamesPlayed === "number"
+      ? body.gamesPlayed
+      : 0;
+    const achievementsCount = isPoisonZombie
+      ? 0
+      : typeof body.achievementsCount === "number"
+      ? body.achievementsCount
+      : 0;
+
+    const playerRecord = {
+      uid: body.uid,
+      displayName: finalName,
+      email: body.email || null,
+      photoURL: body.photoURL || null,
+      equippedAvatar: body.equippedAvatar || "initiate_core",
+      totalScore,
+      gamePoints,
+      achievementXp,
+      gamesPlayed,
+      achievementsCount,
+      title: isPoisonZombie ? "Recruit" : body.title || "Nexus Member",
+      avatarBg: body.avatarBg || "bg-gradient-to-br from-indigo-500 to-purple-600",
+      isOwner: false,
+      updatedAt: new Date().toISOString()
+    };
+
+    const existingIndex = currentPlayers.findIndex(
+      (p: any) => p.uid === body.uid || (body.email && p.email === body.email)
+    );
+    if (existingIndex >= 0) {
+      currentPlayers[existingIndex] = {
+        ...currentPlayers[existingIndex],
+        ...playerRecord
+      };
+    } else {
+      currentPlayers.push(playerRecord);
+    }
+
+    // Filter out any potential owner entries just in case
+    const cleaned = currentPlayers.filter(
+      (p: any) =>
+        !p.isOwner &&
+        (!p.email || p.email.toLowerCase() !== "c65043679@gmail.com") &&
+        p.displayName !== "Gordon Freeman"
+    );
+
+    writeLeaderboardData(cleaned);
+    res.json({ success: true, player: playerRecord, players: cleaned });
   });
 
   // Sitemap.xml with dynamic hostname substitution to support dev, share, and custom domains seamlessly

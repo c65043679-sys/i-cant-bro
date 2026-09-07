@@ -1,11 +1,6 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Default deny
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
     function isSignedIn() {
       return request.auth != null;
     }
@@ -20,7 +15,8 @@ service cloud.firestore {
 
     match /users/{uid} {
       allow read: if true;
-      allow create, update, delete: if isOwner(uid) || isSiteAdmin();
+      allow create, update: if isSignedIn();
+      allow delete: if isOwner(uid) || isSiteAdmin();
       
       match /saves/{gameId} {
         allow read, write: if isOwner(uid) || isSiteAdmin();
@@ -52,7 +48,9 @@ service cloud.firestore {
     // Owner Injected Games (Publicly Readable, Writeable)
     match /injected_games/{gameId} {
       allow read: if true;
-      allow write: if true;
+      allow write: if isSiteAdmin();
     }
   }
 }
+
+
