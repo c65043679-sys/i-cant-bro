@@ -41,6 +41,7 @@ export interface LeaderboardPlayer {
 export const Leaderboard: React.FC = () => {
   const { user, profile, isOwner, signIn } = useAuth();
   const { totalScore, totalXp, gamePoints, gamesPlayed, unlocked, levelTitle } = useAchievements();
+  const unlockedCount = Object.keys(unlocked).length;
 
   const [players, setPlayers] = useState<LeaderboardPlayer[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -54,11 +55,16 @@ export const Leaderboard: React.FC = () => {
 
     const realMap = new Map<string, LeaderboardPlayer>();
 
+    const isOwnerEmail = (e?: string | null) => {
+      const em = (e || '').toLowerCase().trim();
+      return em === 'alexsarsero@gmail.com' || em === 'c65043679@gmail.com';
+    };
+
     const updatePlayersState = () => {
       if (!isMounted) return;
       // Permanently filter out the owner account from leaderboard
       const allPlayers = Array.from(realMap.values()).filter(
-        p => !p.isOwner && (!p.email || p.email.toLowerCase() !== 'c65043679@gmail.com') && p.displayName !== 'Gordon Freeman'
+        p => !p.isOwner && !isOwnerEmail(p.email) && p.displayName !== 'Gordon Freeman'
       );
       setPlayers(allPlayers);
       setLoading(false);
@@ -73,7 +79,7 @@ export const Leaderboard: React.FC = () => {
           if (Array.isArray(json.players)) {
             json.players.forEach((p: any) => {
               const isCurrent = user?.uid === p.uid;
-              const isCurrentOwner = p.isOwner || p.email?.toLowerCase() === 'c65043679@gmail.com' || (isCurrent && isOwner) || p.displayName === 'Gordon Freeman';
+              const isCurrentOwner = p.isOwner || isOwnerEmail(p.email) || (isCurrent && isOwner) || p.displayName === 'Gordon Freeman';
               if (isCurrentOwner) return; // Permanently skip owner
 
               const playerDisplayName = getHlAccountName(p.uid, false, p.email, p.displayName);
@@ -119,7 +125,7 @@ export const Leaderboard: React.FC = () => {
           const data = docSnap.data();
           const playerEmail = (data.email || '').toLowerCase();
           const playerUid = docSnap.id;
-          const isPlayerOwner = playerEmail === 'c65043679@gmail.com' || data.isOwner === true || data.role === 'owner' || (user?.uid === playerUid && isOwner);
+          const isPlayerOwner = playerEmail === 'alexsarsero@gmail.com' || playerEmail === 'c65043679@gmail.com' || data.isOwner === true || data.role === 'owner' || (user?.uid === playerUid && isOwner);
 
           // Permanently skip owner account
           if (isPlayerOwner) return;
@@ -174,7 +180,7 @@ export const Leaderboard: React.FC = () => {
     }
 
     // 3. If currently signed in, push user's stats to /api/leaderboard ONLY if not owner
-    const isCurrentOwner = isOwner || user?.email?.toLowerCase() === 'c65043679@gmail.com';
+    const isCurrentOwner = isOwner || user?.email?.toLowerCase() === 'alexsarsero@gmail.com' || user?.email?.toLowerCase() === 'c65043679@gmail.com';
     if (user && user.uid && !isCurrentOwner) {
       const currentName = getHlAccountName(user.uid, false, user.email, profile?.nickname || profile?.displayName);
       const isCurrentPZ = currentName.toLowerCase().trim() === 'poison zombie';
@@ -211,11 +217,11 @@ export const Leaderboard: React.FC = () => {
       isMounted = false;
       if (unsub) unsub();
     };
-  }, [user, profile, isOwner, totalScore, totalXp, gamePoints, gamesPlayed, unlocked, levelTitle]);
+  }, [user, profile, isOwner, totalScore, totalXp, gamePoints, gamesPlayed, unlockedCount, levelTitle]);
 
   // Sort & Search
   const filteredPlayers = players
-    .filter(p => !p.isOwner && p.displayName !== 'Gordon Freeman' && (!p.email || p.email.toLowerCase() !== 'c65043679@gmail.com'))
+    .filter(p => !p.isOwner && p.displayName !== 'Gordon Freeman' && (!p.email || (p.email.toLowerCase() !== 'alexsarsero@gmail.com' && p.email.toLowerCase() !== 'c65043679@gmail.com')))
     .filter(p => p.displayName.toLowerCase().includes(searchQuery.toLowerCase()))
     .sort((a, b) => b[sortBy] - a[sortBy]);
 
@@ -240,7 +246,7 @@ export const Leaderboard: React.FC = () => {
                   👑 Gordon Freeman (Owner Mode)
                 </p>
                 <p className="text-xs text-slate-300">
-                  Your owner account (<span className="text-amber-200 font-mono font-semibold">c65043679@gmail.com</span>) is permanently hidden from public competition rankings.
+                  Your owner account (<span className="text-amber-200 font-mono font-semibold">{user?.email || 'alexsarsero@gmail.com'}</span>) is permanently hidden from public competition rankings.
                 </p>
               </div>
             </div>

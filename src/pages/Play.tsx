@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ChevronLeft, Info, Gamepad2, Maximize2, Minimize2, Save, CheckCircle2, Heart, Zap, Moon, ZoomIn, Crown, ShieldAlert } from 'lucide-react';
 import { getAllGames } from '../utils/getAllGames';
@@ -14,8 +14,10 @@ export const Play: React.FC = () => {
   const { user, profile, toggleFavorite, isOwner } = useAuth();
   const { settings, updateSetting, triggerPanic } = useSettings();
   const { unlockAchievement, incrementProgress, recordGamePlay, addGameTimePoints } = useAchievements();
-  const allGames = getAllGames();
-  const game = allGames.find((g) => g.id === id);
+  const allGames = useMemo(() => getAllGames(), []);
+  const game = useMemo(() => {
+    return allGames.find((g) => g.id === id);
+  }, [allGames, id]);
   const [godModeAura, setGodModeAura] = useState(() => localStorage.getItem('nexus_godmode_aura') === 'true');
 
   useEffect(() => {
@@ -49,24 +51,30 @@ export const Play: React.FC = () => {
   const [containerWidth, setContainerWidth] = useState<number>(0);
   const [containerHeight, setContainerHeight] = useState<number>(0);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const recordedGameIdRef = useRef<string | null>(null);
 
+  // Record game play and initial achievements ONCE per unique game id
   useEffect(() => {
-    if (game && id) {
-      try {
-        recordGamePlay(id);
-        unlockAchievement('first_blood');
-        incrementProgress('veteran_gamer', 1);
-        incrementProgress('custom_game_tester', 1);
-        const hour = new Date().getHours();
-        if (hour >= 22 || hour < 5) {
-          unlockAchievement('night_owl');
-        }
-      } catch (e) {
-        console.error(e);
-      }
-    }
+    if (!id || !game || recordedGameIdRef.current === id) return;
+    recordedGameIdRef.current = id;
 
-    // Active playtime reward timer: +10 pts every 60 seconds of playing
+    try {
+      recordGamePlay(id);
+      unlockAchievement('first_blood');
+      incrementProgress('veteran_gamer', 1);
+      incrementProgress('custom_game_tester', 1);
+      const hour = new Date().getHours();
+      if (hour >= 22 || hour < 5) {
+        unlockAchievement('night_owl');
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, [id, game, recordGamePlay, unlockAchievement, incrementProgress]);
+
+  // Active playtime reward timer: +10 pts every 60 seconds of active playing
+  useEffect(() => {
+    if (!id) return;
     const playTimer = setInterval(() => {
       try {
         addGameTimePoints(10);
@@ -74,7 +82,7 @@ export const Play: React.FC = () => {
     }, 60000);
 
     return () => clearInterval(playTimer);
-  }, [id, game, recordGamePlay, addGameTimePoints, unlockAchievement, incrementProgress]);
+  }, [id, addGameTimePoints]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -261,7 +269,20 @@ export const Play: React.FC = () => {
   return (
     <div className={`flex-1 max-w-[1440px] mx-auto p-8 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 relative ${settings.theaterMode ? 'bg-black/80 rounded-3xl p-6 transition-colors' : ''}`}>
       <div className="flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-3 text-slate-400 hover:text-white transition-colors group">
+        <Link 
+          to="/" 
+          onClick={() => {
+            if (document.activeElement?.tagName?.toLowerCase() === 'iframe') {
+              try { (document.activeElement as HTMLElement)?.blur(); window.focus(); } catch (e) {}
+            }
+          }}
+          onPointerDown={() => {
+            if (document.activeElement?.tagName?.toLowerCase() === 'iframe') {
+              try { (document.activeElement as HTMLElement)?.blur(); window.focus(); } catch (e) {}
+            }
+          }}
+          className="flex items-center gap-3 text-slate-400 hover:text-white transition-colors group cursor-pointer"
+        >
           <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-white/10 transition-colors">
             <ChevronLeft className="w-5 h-5 group-hover:-translate-x-0.5 transition-transform" />
           </div>
@@ -270,6 +291,7 @@ export const Play: React.FC = () => {
         <div className="flex items-center gap-3">
           <button
             onClick={triggerPanic}
+            onPointerDown={triggerPanic}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 transition-all shadow-lg shadow-red-500/10 cursor-pointer active:scale-95 group/topPanic"
             title={`Emergency Panic Redirect (${settings.panicKey})`}
           >
@@ -290,7 +312,8 @@ export const Play: React.FC = () => {
 
           <button
             onClick={() => updateSetting('theaterMode', !settings.theaterMode)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${
+            onPointerDown={() => updateSetting('theaterMode', !settings.theaterMode)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all border cursor-pointer ${
               settings.theaterMode 
                 ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-lg shadow-[var(--accent)]/20' 
                 : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10 hover:text-white'
@@ -307,7 +330,8 @@ export const Play: React.FC = () => {
               <button
                 key={scale}
                 onClick={() => updateSetting('gameScale', scale)}
-                className={`px-2 py-0.5 rounded-full transition-all text-[10px] ${
+                onPointerDown={() => updateSetting('gameScale', scale)}
+                className={`px-2 py-0.5 rounded-full transition-all text-[10px] cursor-pointer ${
                   settings.gameScale === scale ? 'bg-[var(--accent)] text-white font-bold' : 'hover:text-white'
                 }`}
               >
@@ -320,7 +344,8 @@ export const Play: React.FC = () => {
             <>
               <button
                 onClick={handleToggleFavorite}
-                className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-300 border ${
+                onPointerDown={handleToggleFavorite}
+                className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-300 border cursor-pointer ${
                   isFavorited 
                     ? 'bg-rose-500/20 border-rose-500/30 text-rose-500' 
                     : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10 hover:text-white'
@@ -331,8 +356,9 @@ export const Play: React.FC = () => {
               </button>
               <button
                 onClick={handleSaveData}
+                onPointerDown={handleSaveData}
                 disabled={isSaving}
-                className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-300 border ${
+                className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-300 border cursor-pointer ${
                   saveSuccess 
                     ? 'bg-green-500/20 border-green-500/30 text-green-400' 
                     : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10 hover:text-white'
@@ -358,6 +384,17 @@ export const Play: React.FC = () => {
           <div 
             ref={containerRef}
             onClick={() => iframeRef.current?.focus()}
+            onMouseLeave={() => {
+              if (document.pointerLockElement) {
+                try { document.exitPointerLock(); } catch (e) {}
+              }
+              if (document.activeElement?.tagName?.toLowerCase() === 'iframe') {
+                try {
+                  (document.activeElement as HTMLElement)?.blur();
+                  window.focus();
+                } catch (e) {}
+              }
+            }}
             className={`relative bg-black overflow-hidden group/player cursor-pointer transition-all w-full ${
               isFullscreen 
                 ? 'w-screen h-screen rounded-none border-none' 
@@ -412,6 +449,7 @@ export const Play: React.FC = () => {
 
               return (
                 <iframe
+                  key={game.id}
                   ref={iframeRef}
                   src={game.iframe}
                   scrolling="no"
@@ -551,7 +589,17 @@ export const Play: React.FC = () => {
                 <Link 
                   key={relatedGame.id} 
                   to={`/play/${relatedGame.id}`}
-                  className="group relative aspect-[800/517] rounded-xl overflow-hidden bg-slate-900 border border-white/5 transition-all duration-300 hover:scale-[1.02] hover:z-10 hover:shadow-2xl hover:shadow-black/50"
+                  onClick={() => {
+                    if (document.activeElement?.tagName?.toLowerCase() === 'iframe') {
+                      try { (document.activeElement as HTMLElement)?.blur(); window.focus(); } catch (e) {}
+                    }
+                  }}
+                  onPointerDown={() => {
+                    if (document.activeElement?.tagName?.toLowerCase() === 'iframe') {
+                      try { (document.activeElement as HTMLElement)?.blur(); window.focus(); } catch (e) {}
+                    }
+                  }}
+                  className="group relative aspect-[800/517] rounded-xl overflow-hidden bg-slate-900 border border-white/5 transition-all duration-300 hover:scale-[1.02] hover:z-10 hover:shadow-2xl hover:shadow-black/50 cursor-pointer"
                   title={relatedGame.title}
                 >
                   <div 

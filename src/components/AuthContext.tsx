@@ -54,7 +54,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return saved === 'true';
   });
 
-  const isOwner = (user?.email?.toLowerCase() === 'c65043679@gmail.com') || isOwnerUnlocked;
+  const isOwner = (user?.email?.toLowerCase() === 'alexsarsero@gmail.com') || isOwnerUnlocked;
 
   useEffect(() => {
     let unsubscribeProfile: (() => void) | null = null;
@@ -115,7 +115,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setUser(user);
-        const isUserOwner = (user.email?.toLowerCase() === 'c65043679@gmail.com') || (sessionStorage.getItem('isOwner') === 'true');
+        const isUserOwner = (user.email?.toLowerCase() === 'alexsarsero@gmail.com') || (sessionStorage.getItem('isOwner') === 'true');
         const autoGamerTag = generateGamerTag(user.uid, isUserOwner, user.email);
         localStorage.setItem('username', autoGamerTag);
 
@@ -363,7 +363,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateProfile = async (data: Partial<UserProfile>) => {
-    const isUserOwner = (user?.email?.toLowerCase() === 'c65043679@gmail.com') || isOwnerUnlocked;
+    const isUserOwner = (user?.email?.toLowerCase() === 'alexsarsero@gmail.com') || isOwnerUnlocked;
     const chosenName = user?.uid 
       ? generateGamerTag(user.uid, isUserOwner, user.email) 
       : generateGamerTag(localStorage.getItem('username'), isUserOwner);

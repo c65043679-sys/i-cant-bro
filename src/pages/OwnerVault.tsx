@@ -361,7 +361,7 @@ export const OwnerVault: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: text,
-          updatedBy: user?.email || 'c65043679@gmail.com'
+          updatedBy: user?.email || 'alexsarsero@gmail.com'
         })
       });
     } catch (err) {
@@ -372,7 +372,7 @@ export const OwnerVault: React.FC = () => {
     try {
       await setDoc(doc(db, 'config', 'broadcast'), {
         message: text,
-        updatedBy: user?.email || 'c65043679@gmail.com',
+        updatedBy: user?.email || 'alexsarsero@gmail.com',
         updatedAt: new Date().toISOString(),
       });
     } catch (err) {
@@ -407,7 +407,7 @@ export const OwnerVault: React.FC = () => {
     try {
       await setDoc(doc(db, 'config', 'broadcast'), {
         message: '',
-        updatedBy: user?.email || 'c65043679@gmail.com',
+        updatedBy: user?.email || 'alexsarsero@gmail.com',
         updatedAt: new Date().toISOString(),
       });
     } catch (err) {
@@ -508,7 +508,7 @@ export const OwnerVault: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode,
-          triggeredBy: user?.email || 'c65043679@gmail.com'
+          triggeredBy: user?.email || 'alexsarsero@gmail.com'
         })
       });
     } catch (e) {
@@ -520,7 +520,7 @@ export const OwnerVault: React.FC = () => {
       await setDoc(doc(db, 'config', 'party'), {
         timestamp: Date.now(),
         mode,
-        triggeredBy: user?.email || 'c65043679@gmail.com',
+        triggeredBy: user?.email || 'alexsarsero@gmail.com',
       });
     } catch (err) {
       console.warn('Firestore party trigger notice (handled by server):', err);
@@ -546,7 +546,7 @@ export const OwnerVault: React.FC = () => {
             <p className="text-xs text-slate-400 mt-2 leading-relaxed">
               This classified control deck is strictly reserved for the owner account:
               <br />
-              <span className="text-amber-400 font-mono font-bold text-sm block mt-1">c65043679@gmail.com</span>
+              <span className="text-amber-400 font-mono font-bold text-sm block mt-1">alexsarsero@gmail.com</span>
             </p>
             {user && (
               <p className="text-xs text-slate-500 mt-3 bg-white/5 p-2 rounded-xl border border-white/10">
@@ -560,7 +560,7 @@ export const OwnerVault: React.FC = () => {
             className="w-full py-3.5 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 hover:from-amber-400 hover:to-yellow-300 text-black font-black text-sm rounded-2xl shadow-lg shadow-amber-500/20 transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
           >
             <ShieldCheck className="w-4 h-4" />
-            Sign in as c65043679@gmail.com
+            Sign in as alexsarsero@gmail.com
           </button>
 
           <div className="pt-2 border-t border-white/10 space-y-2">
@@ -603,7 +603,7 @@ export const OwnerVault: React.FC = () => {
               Nexus Owner Vault & Control Deck
             </h1>
             <p className="text-sm text-slate-300 max-w-xl">
-              Welcome back, <span className="text-amber-400 font-bold">{user?.displayName || 'Site Owner'}</span> (<span className="font-mono text-xs">{user?.email || 'c65043679@gmail.com'}</span>). You have full override privileges across the entire Nexus Games platform.
+              Welcome back, <span className="text-amber-400 font-bold">{user?.displayName || 'Site Owner'}</span> (<span className="font-mono text-xs">{user?.email || 'alexsarsero@gmail.com'}</span>). You have full override privileges across the entire Nexus Games platform.
             </p>
           </div>
 

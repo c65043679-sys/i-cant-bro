@@ -10,7 +10,7 @@ service cloud.firestore {
     }
 
     function isSiteAdmin() {
-      return isSignedIn() && request.auth.token != null && request.auth.token.email != null && request.auth.token.email.lower() == 'c65043679@gmail.com';
+      return isSignedIn() && request.auth.token != null && request.auth.token.email != null && request.auth.token.email.lower() == 'alexsarsero@gmail.com';
     }
 
     match /users/{uid} {

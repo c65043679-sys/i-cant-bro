@@ -29,16 +29,33 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeCategory, onCategoryChan
   const navigate = useNavigate();
 
   return (
-    <aside className="w-[240px] shrink-0 hidden md:flex flex-col p-6 border-r border-white/10 bg-slate-900/40 backdrop-blur-md min-h-screen gap-8">
+    <aside className="w-[240px] shrink-0 hidden md:flex flex-col p-6 border-r border-white/10 bg-slate-900/40 backdrop-blur-md min-h-screen gap-6">
       <div>
-        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4">Discover</p>
+        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Discover</p>
         <ul className="space-y-1">
           {CATEGORIES.map((cat) => {
             const isActive = activeCategory === cat.id;
             return (
               <li
                 key={cat.id}
+                onPointerEnter={() => {
+                  if (document.activeElement?.tagName?.toLowerCase() === 'iframe') {
+                    try { (document.activeElement as HTMLElement)?.blur(); window.focus(); } catch (e) {}
+                  }
+                }}
                 onClick={() => {
+                  if (document.activeElement?.tagName?.toLowerCase() === 'iframe') {
+                    try { (document.activeElement as HTMLElement)?.blur(); window.focus(); } catch (e) {}
+                  }
+                  onCategoryChange(cat.id);
+                  if (location.pathname !== '/') {
+                    navigate('/');
+                  }
+                }}
+                onPointerDown={() => {
+                  if (document.activeElement?.tagName?.toLowerCase() === 'iframe') {
+                    try { (document.activeElement as HTMLElement)?.blur(); window.focus(); } catch (e) {}
+                  }
                   onCategoryChange(cat.id);
                   if (location.pathname !== '/') {
                     navigate('/');

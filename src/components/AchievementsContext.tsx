@@ -340,6 +340,24 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
     progressDataRef.current = progressData;
   }, [progressData]);
 
+  const userRef = useRef(user);
+  useEffect(() => { userRef.current = user; }, [user]);
+
+  const profileRef = useRef(profile);
+  useEffect(() => { profileRef.current = profile; }, [profile]);
+
+  const gamePointsRef = useRef(gamePoints);
+  useEffect(() => { gamePointsRef.current = gamePoints; }, [gamePoints]);
+
+  const gamesPlayedRef = useRef(gamesPlayed);
+  useEffect(() => { gamesPlayedRef.current = gamesPlayed; }, [gamesPlayed]);
+
+  const bonusXpRef = useRef(bonusXp);
+  useEffect(() => { bonusXpRef.current = bonusXp; }, [bonusXp]);
+
+  const spentXpRef = useRef(spentXp);
+  useEffect(() => { spentXpRef.current = spentXp; }, [spentXp]);
+
   // Sync with Firestore if logged in; merge without wiping local data
   useEffect(() => {
     if (!user) {
@@ -433,18 +451,25 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   // Immediate save helper to sync state to Firestore and localStorage
   const flushSave = useCallback(async () => {
+    const curUser = userRef.current;
+    const curProfile = profileRef.current;
+    const curGamePoints = gamePointsRef.current;
+    const curGamesPlayed = gamesPlayedRef.current;
+    const curBonusXp = bonusXpRef.current;
+    const curSpentXp = spentXpRef.current;
+
     try {
       localStorage.setItem('nexus_achievements', JSON.stringify(unlockedRef.current));
       localStorage.setItem('nexus_achievements_progress', JSON.stringify(progressDataRef.current));
-      localStorage.setItem('nexus_game_points', gamePoints.toString());
-      localStorage.setItem('nexus_games_played', gamesPlayed.toString());
-      localStorage.setItem('nexus_bonus_xp', bonusXp.toString());
-      localStorage.setItem('nexus_spent_xp', spentXp.toString());
+      localStorage.setItem('nexus_game_points', curGamePoints.toString());
+      localStorage.setItem('nexus_games_played', curGamesPlayed.toString());
+      localStorage.setItem('nexus_bonus_xp', curBonusXp.toString());
+      localStorage.setItem('nexus_spent_xp', curSpentXp.toString());
     } catch (e) {}
 
-    if (!user) return;
+    if (!curUser) return;
 
-    let activeUName = profile?.nickname || profile?.displayName || localStorage.getItem('username') || 'Nexus Explorer';
+    let activeUName = curProfile?.nickname || curProfile?.displayName || localStorage.getItem('username') || 'Nexus Explorer';
     if (containsProfanity(activeUName) || activeUName.toLowerCase().includes('sarsero')) {
       activeUName = 'Nexus Explorer';
     }
@@ -455,33 +480,33 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
       return acc + (ach ? ach.xp : 0);
     }, 0);
 
-    const currentXp = isPZ ? 4000 : (baseCurrentXp + bonusXp);
-    const effectiveGp = isPZ ? Math.min(gamePoints, 1000) : gamePoints;
+    const currentXp = isPZ ? 4000 : (baseCurrentXp + curBonusXp);
+    const effectiveGp = isPZ ? Math.min(curGamePoints, 1000) : curGamePoints;
     const totalScoreVal = isPZ ? 5000 : (currentXp + effectiveGp);
-    const effectiveGamesPlayedCount = isPZ ? 0 : gamesPlayed;
+    const effectiveGamesPlayedCount = isPZ ? 0 : curGamesPlayed;
     const currentLevel = Math.floor(totalScoreVal / 250) + 1;
     const currentLevelTitle = isPZ ? 'Recruit' : LEVEL_TITLES[Math.min(currentLevel - 1, LEVEL_TITLES.length - 1)];
 
     try {
-      await setDoc(doc(db, 'users', user.uid, 'data', 'achievements'), {
+      await setDoc(doc(db, 'users', curUser.uid, 'data', 'achievements'), {
         unlocked: unlockedRef.current,
         progress: progressDataRef.current,
         gamePoints: effectiveGp,
         gamesPlayed: effectiveGamesPlayedCount,
-        bonusXp,
-        spentXp,
+        bonusXp: curBonusXp,
+        spentXp: curSpentXp,
         updatedAt: new Date().toISOString()
       }, { merge: true });
 
       const userDocData: any = {
-        uid: user.uid,
-        email: user.email,
-        photoURL: user.photoURL || localStorage.getItem('userpic') || null,
+        uid: curUser.uid,
+        email: curUser.email,
+        photoURL: curUser.photoURL || localStorage.getItem('userpic') || null,
         nickname: activeUName,
         displayName: activeUName,
         totalScore: totalScoreVal,
         totalXp: currentXp,
-        bonusXp,
+        bonusXp: curBonusXp,
         gamePoints: effectiveGp,
         gamesPlayed: effectiveGamesPlayedCount,
         achievementsCount: isPZ ? 0 : Object.keys(unlockedRef.current).length,
@@ -489,22 +514,23 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
         updatedAt: new Date().toISOString()
       };
 
-      await setDoc(doc(db, 'users', user.uid), userDocData, { merge: true });
+      await setDoc(doc(db, 'users', curUser.uid), userDocData, { merge: true });
     } catch (err) {
       console.warn('Error in flushSave:', err);
     }
 
     // Sync to shared server leaderboard API so other website users immediately see progress (owner is permanently excluded)
-    const isOwnerUser = (user.email?.toLowerCase() === 'c65043679@gmail.com') || (sessionStorage.getItem('isOwner') === 'true') || activeUName === 'Gordon Freeman';
+    const userEmail = (curUser.email || '').toLowerCase();
+    const isOwnerUser = userEmail === 'alexsarsero@gmail.com' || userEmail === 'c65043679@gmail.com' || (sessionStorage.getItem('isOwner') === 'true') || activeUName === 'Gordon Freeman';
     if (!isOwnerUser) {
       try {
         fetch('/api/leaderboard', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            uid: user.uid,
-            email: user.email,
-            photoURL: user.photoURL || localStorage.getItem('userpic') || null,
+            uid: curUser.uid,
+            email: curUser.email,
+            photoURL: curUser.photoURL || localStorage.getItem('userpic') || null,
             displayName: activeUName,
             totalScore: totalScoreVal,
             achievementXp: currentXp,
@@ -517,7 +543,7 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
         }).catch(() => {});
       } catch (e) {}
     }
-  }, [user, profile, gamePoints, gamesPlayed, bonusXp, spentXp]);
+  }, []);
 
   // Sync to localStorage on every change and debounce Firestore save (800ms)
   useEffect(() => {

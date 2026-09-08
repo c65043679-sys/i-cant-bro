@@ -54,7 +54,7 @@ export function isHlEnemy(name?: string | null): boolean {
 }
 
 export function generateGamerTag(seed?: string | null, isOwner?: boolean, email?: string | null): string {
-  if (isOwner || email?.toLowerCase() === 'c65043679@gmail.com') {
+  if (isOwner || email?.toLowerCase() === 'alexsarsero@gmail.com') {
     return 'Gordon Freeman';
   }
 
@@ -63,7 +63,7 @@ export function generateGamerTag(seed?: string | null, isOwner?: boolean, email?
   }
 
   const normalizedSeed = seed.trim().toLowerCase();
-  if (normalizedSeed === 'c65043679@gmail.com' || normalizedSeed === 'gordon' || normalizedSeed === 'gordon freeman' || normalizedSeed === 'owner') {
+  if (normalizedSeed === 'alexsarsero@gmail.com' || normalizedSeed === 'gordon' || normalizedSeed === 'gordon freeman' || normalizedSeed === 'owner') {
     return 'Gordon Freeman';
   }
 
@@ -80,7 +80,7 @@ export function generateGamerTag(seed?: string | null, isOwner?: boolean, email?
 }
 
 export function getHlAccountName(seed?: string | null, isOwner?: boolean, email?: string | null, existingName?: string | null): string {
-  if (isOwner || email?.toLowerCase() === 'c65043679@gmail.com') {
+  if (isOwner || email?.toLowerCase() === 'alexsarsero@gmail.com') {
     return 'Gordon Freeman';
   }
 

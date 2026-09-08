@@ -152,7 +152,7 @@ async function startServer() {
     const broadcastData = {
       message: typeof message === "string" ? message.trim() : "",
       updatedAt: new Date().toISOString(),
-      updatedBy: updatedBy || "c65043679@gmail.com"
+      updatedBy: updatedBy || "alexsarsero@gmail.com"
     };
     writeJsonFile(BROADCAST_FILE, broadcastData);
     sendSseEvent("broadcast", broadcastData);
@@ -164,7 +164,7 @@ async function startServer() {
     const broadcastData = {
       message: "",
       updatedAt: new Date().toISOString(),
-      updatedBy: "c65043679@gmail.com"
+      updatedBy: "alexsarsero@gmail.com"
     };
     writeJsonFile(BROADCAST_FILE, broadcastData);
     sendSseEvent("broadcast", broadcastData);
@@ -183,7 +183,7 @@ async function startServer() {
     const partyData = {
       mode: mode === "cannon" ? "cannon" : "fireworks",
       timestamp: Date.now(),
-      triggeredBy: triggeredBy || "c65043679@gmail.com"
+      triggeredBy: triggeredBy || "alexsarsero@gmail.com"
     };
     writeJsonFile(PARTY_FILE, partyData);
     sendSseEvent("party", partyData);
@@ -234,15 +234,22 @@ async function startServer() {
     }
   }
 
+  // Helper to check if player is an owner or deleted owner account
+  function isOwnerRecord(p: any): boolean {
+    if (!p) return false;
+    const email = (p.email || "").toLowerCase().trim();
+    return (
+      p.isOwner === true ||
+      email === "alexsarsero@gmail.com" ||
+      email === "c65043679@gmail.com" ||
+      p.displayName === "Gordon Freeman"
+    );
+  }
+
   // GET /api/leaderboard - Returns real registered website users only (owner permanently excluded)
   app.get("/api/leaderboard", (req, res) => {
     const rawPlayers = readLeaderboardData();
-    const players = rawPlayers.filter(
-      (p: any) =>
-        !p.isOwner &&
-        (!p.email || p.email.toLowerCase() !== "c65043679@gmail.com") &&
-        p.displayName !== "Gordon Freeman"
-    );
+    const players = rawPlayers.filter((p: any) => !isOwnerRecord(p));
     res.json({ players });
   });
 
@@ -254,19 +261,11 @@ async function startServer() {
     }
 
     const currentPlayers = readLeaderboardData();
-    const isOwner =
-      (body.email && body.email.toLowerCase() === "c65043679@gmail.com") ||
-      body.isOwner === true ||
-      body.displayName === "Gordon Freeman";
+    const isOwner = isOwnerRecord(body);
 
     if (isOwner) {
       // Owner is permanently excluded from competition standings
-      const purged = currentPlayers.filter(
-        (p: any) =>
-          !p.isOwner &&
-          (!p.email || p.email.toLowerCase() !== "c65043679@gmail.com") &&
-          p.displayName !== "Gordon Freeman"
-      );
+      const purged = currentPlayers.filter((p: any) => !isOwnerRecord(p));
       if (purged.length !== currentPlayers.length) {
         writeLeaderboardData(purged);
       }
@@ -340,12 +339,7 @@ async function startServer() {
     }
 
     // Filter out any potential owner entries just in case
-    const cleaned = currentPlayers.filter(
-      (p: any) =>
-        !p.isOwner &&
-        (!p.email || p.email.toLowerCase() !== "c65043679@gmail.com") &&
-        p.displayName !== "Gordon Freeman"
-    );
+    const cleaned = currentPlayers.filter((p: any) => !isOwnerRecord(p));
 
     writeLeaderboardData(cleaned);
     res.json({ success: true, player: playerRecord, players: cleaned });

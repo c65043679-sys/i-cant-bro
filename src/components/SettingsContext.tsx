@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { soundManager } from '../utils/soundEffects';
 
 export interface ThemePreset {
@@ -338,29 +338,35 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
   }, [settings.panicKey, triggerPanic]);
 
-  const updateSetting = <K extends keyof SettingsState>(key: K, value: SettingsState[K]) => {
+  const settingsRef = useRef(settings);
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
+
+  const updateSetting = useCallback(<K extends keyof SettingsState>(key: K, value: SettingsState[K]) => {
     setSettings(prev => {
       const updated = { ...prev, [key]: value };
       return updated;
     });
+    const soundEnabled = settingsRef.current.uiSoundEffects;
     if (typeof value === 'boolean') {
-      soundManager.playToggle(settings.uiSoundEffects, value);
+      soundManager.playToggle(soundEnabled, value);
     } else if (key === 'themeColor') {
-      soundManager.playColorSelect(settings.uiSoundEffects);
+      soundManager.playColorSelect(soundEnabled);
     } else {
-      soundManager.playClick(settings.uiSoundEffects);
+      soundManager.playClick(soundEnabled);
     }
-  };
+  }, []);
 
-  const updateSettings = (partial: Partial<SettingsState>) => {
+  const updateSettings = useCallback((partial: Partial<SettingsState>) => {
     setSettings(prev => ({ ...prev, ...partial }));
-    soundManager.playClick(settings.uiSoundEffects);
-  };
+    soundManager.playClick(settingsRef.current.uiSoundEffects);
+  }, []);
 
-  const resetSettings = () => {
+  const resetSettings = useCallback(() => {
     setSettings(DEFAULT_SETTINGS);
     soundManager.playClick(DEFAULT_SETTINGS.uiSoundEffects);
-  };
+  }, []);
 
   return (
     <SettingsContext.Provider value={{

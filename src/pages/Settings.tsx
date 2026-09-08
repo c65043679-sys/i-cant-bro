@@ -587,14 +587,14 @@ export const Settings: React.FC = () => {
                 <div>
                   <label className="block text-xs font-bold text-slate-400 mb-2">Assigned Combat Handle</label>
                   <div className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm font-bold text-amber-400 font-mono flex items-center justify-between shadow-inner">
-                    <span>{isOwner || user.email?.toLowerCase() === 'c65043679@gmail.com' ? 'Gordon Freeman' : getHlAccountName(user.uid, false, user.email, profile?.nickname)}</span>
+                    <span>{isOwner || user.email?.toLowerCase() === 'alexsarsero@gmail.com' ? 'Gordon Freeman' : getHlAccountName(user.uid, false, user.email, profile?.nickname)}</span>
                     <span className="text-[10px] text-slate-400 font-sans font-normal">
-                      {isOwner || user.email?.toLowerCase() === 'c65043679@gmail.com' ? '👑 Owner' : 'Half-Life Combatant'}
+                      {isOwner || user.email?.toLowerCase() === 'alexsarsero@gmail.com' ? '👑 Owner' : 'Half-Life Combatant'}
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-400 mt-1.5">
-                    {isOwner || user.email?.toLowerCase() === 'c65043679@gmail.com'
-                      ? 'Owner account designated as Gordon Freeman (c65043679@gmail.com).'
+                    {isOwner || user.email?.toLowerCase() === 'alexsarsero@gmail.com'
+                      ? 'Owner account designated as Gordon Freeman (alexsarsero@gmail.com).'
                       : 'Accounts are deterministically assigned Half-Life 1 and 2 enemy handles.'}
                   </p>
                 </div>
