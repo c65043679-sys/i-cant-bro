@@ -48,6 +48,13 @@ export const Leaderboard: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortBy, setSortBy] = useState<'totalScore' | 'gamePoints' | 'achievementXp' | 'gamesPlayed'>('totalScore');
 
+  // Determine current player identity (signed in or guest)
+  const currentPlayerId = user?.uid || localStorage.getItem('nexus_player_id') || 'player_active';
+  const currentName = user
+    ? getHlAccountName(user.uid, false, user.email, profile?.nickname || profile?.displayName)
+    : getHlAccountName(currentPlayerId, false, null, localStorage.getItem('username'));
+  const isCurrentOwner = (user?.email?.toLowerCase().trim() === 'alexsarsero@gmail.com') || currentName === 'Gordon Freeman';
+
   useEffect(() => {
     let unsub: (() => void) | undefined;
     let isMounted = true;
@@ -57,12 +64,49 @@ export const Leaderboard: React.FC = () => {
 
     const isOwnerEmail = (e?: string | null) => {
       const em = (e || '').toLowerCase().trim();
-      return em === 'alexsarsero@gmail.com' || em === 'c65043679@gmail.com';
+      return em === 'alexsarsero@gmail.com';
     };
+
+    const isCurrentPZ = currentName.toLowerCase().trim() === 'poison zombie';
+    const isCurrentManhack = currentName.toLowerCase().trim() === 'manhack';
+
+    const currentFinalScore = isCurrentManhack ? 0 : (isCurrentPZ ? 5000 : totalScore);
+    const currentFinalGp = isCurrentManhack ? 0 : (isCurrentPZ ? 1000 : gamePoints);
+    const currentFinalXp = isCurrentManhack ? 0 : (isCurrentPZ ? 4000 : totalXp);
+    const currentFinalGames = isCurrentManhack ? 0 : (isCurrentPZ ? 0 : gamesPlayed);
+    const currentFinalAchCount = isCurrentManhack ? 0 : (isCurrentPZ ? 0 : unlockedCount);
+    const currentFinalTitle = isCurrentManhack ? 'Recruit' : (isCurrentPZ ? 'Recruit' : levelTitle);
+
+    const currentUserPayload: LeaderboardPlayer = {
+      uid: currentPlayerId,
+      displayName: currentName,
+      email: user?.email || null,
+      photoURL: user?.photoURL || localStorage.getItem('userpic') || null,
+      equippedAvatar: profile?.equippedAvatar || localStorage.getItem('nexus_equipped_avatar') || 'initiate_core',
+      totalScore: currentFinalScore,
+      gamePoints: currentFinalGp,
+      achievementXp: currentFinalXp,
+      gamesPlayed: currentFinalGames,
+      achievementsCount: currentFinalAchCount,
+      isOwner: false,
+      title: currentFinalTitle,
+      avatarBg: 'bg-gradient-to-br from-indigo-500 to-purple-600',
+      isCurrentUser: true
+    };
+
+    if (!isCurrentOwner) {
+      realMap.set(currentPlayerId, currentUserPayload);
+      // Sync current active player to server
+      fetch('/api/leaderboard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(currentUserPayload)
+      }).catch(() => {});
+    }
 
     const updatePlayersState = () => {
       if (!isMounted) return;
-      // Permanently filter out the owner account from leaderboard
+      // Permanently filter out the owner account (Gordon Freeman) from leaderboard
       const allPlayers = Array.from(realMap.values()).filter(
         p => !p.isOwner && !isOwnerEmail(p.email) && p.displayName !== 'Gordon Freeman'
       );
@@ -70,7 +114,7 @@ export const Leaderboard: React.FC = () => {
       setLoading(false);
     };
 
-    // 1. Fetch shared leaderboard players from server API (only real non-owner users)
+    // 1. Fetch shared leaderboard players from server API
     const loadApiLeaderboard = async () => {
       try {
         const res = await fetch('/api/leaderboard');
@@ -78,21 +122,21 @@ export const Leaderboard: React.FC = () => {
           const json = await res.json();
           if (Array.isArray(json.players)) {
             json.players.forEach((p: any) => {
-              const isCurrent = user?.uid === p.uid;
-              const isCurrentOwner = p.isOwner || isOwnerEmail(p.email) || (isCurrent && isOwner) || p.displayName === 'Gordon Freeman';
-              if (isCurrentOwner) return; // Permanently skip owner
+              const isCurrent = p.uid === currentPlayerId || (user?.email && p.email === user.email) || p.displayName === currentName;
+              const isExcludedOwner = p.isOwner || isOwnerEmail(p.email) || (isCurrent && isCurrentOwner) || p.displayName === 'Gordon Freeman';
+              if (isExcludedOwner) return; // Permanently skip owner
 
-              const playerDisplayName = getHlAccountName(p.uid, false, p.email, p.displayName);
+              const playerDisplayName = isCurrent ? currentName : getHlAccountName(p.uid, false, p.email, p.displayName);
               if (playerDisplayName === 'Gordon Freeman') return;
 
               const isPoisonZombie = playerDisplayName.toLowerCase().trim() === 'poison zombie' || playerDisplayName.toLowerCase().trim() === 'poision zombie';
               const isManhack = playerDisplayName.toLowerCase().trim() === 'manhack';
 
-              let finalTot = isCurrent ? (isPoisonZombie ? 5000 : totalScore) : (isPoisonZombie ? 5000 : p.totalScore);
-              let finalGp = isCurrent ? (isPoisonZombie ? 1000 : gamePoints) : p.gamePoints;
-              let finalXp = isCurrent ? (isPoisonZombie ? 4000 : totalXp) : p.achievementXp;
-              let finalGames = isCurrent ? (isPoisonZombie ? 0 : gamesPlayed) : p.gamesPlayed;
-              let finalAchCount = isCurrent ? (isPoisonZombie ? 0 : Object.keys(unlocked).length) : p.achievementsCount;
+              let finalTot = isCurrent ? currentFinalScore : (isPoisonZombie ? 5000 : p.totalScore);
+              let finalGp = isCurrent ? currentFinalGp : (isPoisonZombie ? 1000 : p.gamePoints);
+              let finalXp = isCurrent ? currentFinalXp : (isPoisonZombie ? 4000 : p.achievementXp);
+              let finalGames = isCurrent ? currentFinalGames : (isPoisonZombie ? 0 : p.gamesPlayed);
+              let finalAchCount = isCurrent ? currentFinalAchCount : (isPoisonZombie ? 0 : p.achievementsCount);
 
               if (isManhack) {
                 finalTot = 0;
@@ -107,14 +151,14 @@ export const Leaderboard: React.FC = () => {
                 displayName: playerDisplayName,
                 email: p.email,
                 photoURL: p.photoURL,
-                equippedAvatar: p.equippedAvatar || 'initiate_core',
+                equippedAvatar: isCurrent ? currentUserPayload.equippedAvatar : (p.equippedAvatar || 'initiate_core'),
                 totalScore: finalTot,
                 gamePoints: finalGp,
                 achievementXp: finalXp,
                 gamesPlayed: finalGames,
                 achievementsCount: finalAchCount,
                 isOwner: false,
-                title: isManhack ? 'Recruit' : isPoisonZombie ? 'Recruit' : (p.title || 'Nexus Member'),
+                title: isManhack ? 'Recruit' : isPoisonZombie ? 'Recruit' : (isCurrent ? currentFinalTitle : (p.title || 'Nexus Member')),
                 avatarBg: p.avatarBg || 'bg-gradient-to-br from-indigo-500 to-purple-600',
                 isCurrentUser: isCurrent
               });
@@ -134,9 +178,9 @@ export const Leaderboard: React.FC = () => {
           const data = docSnap.data();
           const playerEmail = (data.email || '').toLowerCase();
           const playerUid = docSnap.id;
-          const isPlayerOwner = playerEmail === 'alexsarsero@gmail.com' || playerEmail === 'c65043679@gmail.com' || data.isOwner === true || data.role === 'owner' || (user?.uid === playerUid && isOwner);
+          const isPlayerOwner = playerEmail === 'alexsarsero@gmail.com' || data.isOwner === true || (isOwner && user?.uid === playerUid);
 
-          // Permanently skip owner account
+          // Skip owner account
           if (isPlayerOwner) return;
 
           const playerDisplayName = getHlAccountName(playerUid, false, data.email, data.nickname || data.displayName);
@@ -162,12 +206,12 @@ export const Leaderboard: React.FC = () => {
             pAchCount = 0;
           }
 
-          const isCurrent = user?.uid === playerUid;
-          let finalTot = isCurrent ? (isPoisonZombie ? 5000 : totalScore) : (isPoisonZombie ? 5000 : (pXp + pGp));
-          let finalGp = isCurrent ? (isPoisonZombie ? 1000 : gamePoints) : pGp;
-          let finalXp = isCurrent ? (isPoisonZombie ? 4000 : totalXp) : pXp;
-          let finalGames = isCurrent ? (isPoisonZombie ? 0 : gamesPlayed) : pGamesPlayed;
-          let finalAchCount = isCurrent ? (isPoisonZombie ? 0 : Object.keys(unlocked).length) : pAchCount;
+          const isCurrent = playerUid === currentPlayerId || (user?.uid === playerUid);
+          let finalTot = isCurrent ? currentFinalScore : (isPoisonZombie ? 5000 : (pXp + pGp));
+          let finalGp = isCurrent ? currentFinalGp : (isPoisonZombie ? 1000 : pGp);
+          let finalXp = isCurrent ? currentFinalXp : (isPoisonZombie ? 4000 : pXp);
+          let finalGames = isCurrent ? currentFinalGames : (isPoisonZombie ? 0 : pGamesPlayed);
+          let finalAchCount = isCurrent ? currentFinalAchCount : (isPoisonZombie ? 0 : pAchCount);
 
           if (isManhack) {
             finalTot = 0;
@@ -182,57 +226,25 @@ export const Leaderboard: React.FC = () => {
             displayName: playerDisplayName,
             email: data.email,
             photoURL: data.photoURL,
-            equippedAvatar: data.equippedAvatar || 'initiate_core',
+            equippedAvatar: isCurrent ? currentUserPayload.equippedAvatar : (data.equippedAvatar || 'initiate_core'),
             totalScore: finalTot,
             gamePoints: finalGp,
             achievementXp: finalXp,
             gamesPlayed: finalGames,
             achievementsCount: finalAchCount,
             isOwner: false,
-            title: isManhack ? 'Recruit' : isPoisonZombie ? 'Recruit' : (data.levelTitle || 'Nexus Explorer'),
+            title: isManhack ? 'Recruit' : isPoisonZombie ? 'Recruit' : (isCurrent ? currentFinalTitle : (data.levelTitle || 'Nexus Explorer')),
             avatarBg: 'bg-gradient-to-br from-indigo-500 to-purple-600',
             isCurrentUser: isCurrent
           });
         });
         updatePlayersState();
       }, (err) => {
+        // Fallback gracefully on Firestore error (e.g. permission or unauthenticated)
         updatePlayersState();
       });
     } catch (e) {
       updatePlayersState();
-    }
-
-    // 3. If currently signed in, push user's stats to /api/leaderboard ONLY if not owner
-    const isCurrentOwner = isOwner || user?.email?.toLowerCase() === 'alexsarsero@gmail.com' || user?.email?.toLowerCase() === 'c65043679@gmail.com';
-    if (user && user.uid && !isCurrentOwner) {
-      const currentName = getHlAccountName(user.uid, false, user.email, profile?.nickname || profile?.displayName);
-      const isCurrentPZ = currentName.toLowerCase().trim() === 'poison zombie';
-      const isCurrentManhack = currentName.toLowerCase().trim() === 'manhack';
-
-      const userPayload: LeaderboardPlayer = {
-        uid: user.uid,
-        displayName: currentName,
-        email: user.email,
-        photoURL: user.photoURL || localStorage.getItem('userpic') || undefined,
-        equippedAvatar: profile?.equippedAvatar || 'initiate_core',
-        totalScore: isCurrentManhack ? 0 : (isCurrentPZ ? 5000 : totalScore),
-        gamePoints: isCurrentManhack ? 0 : (isCurrentPZ ? 1000 : gamePoints),
-        achievementXp: isCurrentManhack ? 0 : (isCurrentPZ ? 4000 : totalXp),
-        gamesPlayed: isCurrentManhack ? 0 : (isCurrentPZ ? 0 : gamesPlayed),
-        achievementsCount: isCurrentManhack ? 0 : (isCurrentPZ ? 0 : Object.keys(unlocked).length),
-        isOwner: false,
-        title: isCurrentManhack ? 'Recruit' : isCurrentPZ ? 'Recruit' : levelTitle,
-        avatarBg: 'bg-gradient-to-br from-indigo-500 to-purple-600',
-        isCurrentUser: true
-      };
-
-      realMap.set(user.uid, userPayload);
-
-      fetch('/api/leaderboard', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(userPayload)
-      }).catch(e => console.warn('Failed to post user stats to leaderboard API:', e));
     }
 
     loadApiLeaderboard();
@@ -245,7 +257,7 @@ export const Leaderboard: React.FC = () => {
 
   // Sort & Search
   const filteredPlayers = players
-    .filter(p => !p.isOwner && p.displayName !== 'Gordon Freeman' && (!p.email || (p.email.toLowerCase() !== 'alexsarsero@gmail.com' && p.email.toLowerCase() !== 'c65043679@gmail.com')))
+    .filter(p => !p.isOwner && p.displayName !== 'Gordon Freeman' && (!p.email || p.email.toLowerCase() !== 'alexsarsero@gmail.com'))
     .filter(p => p.displayName.toLowerCase().includes(searchQuery.toLowerCase()))
     .sort((a, b) => b[sortBy] - a[sortBy]);
 
@@ -258,8 +270,8 @@ export const Leaderboard: React.FC = () => {
       <div className="bg-slate-900/60 border border-white/10 rounded-2xl p-6 sm:p-8 backdrop-blur-xl relative overflow-hidden shadow-2xl space-y-6">
         <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        {/* Owner Notice - Permanently Hidden from Leaderboard */}
-        {isOwner && (
+        {/* Owner Notice - Only Gordon Freeman is permanently hidden */}
+        {isCurrentOwner && (
           <div className="bg-gradient-to-r from-amber-500/15 via-yellow-500/10 to-amber-500/15 border border-amber-500/30 p-4 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3.5 backdrop-blur-md relative z-10">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-lg bg-amber-400 text-black flex items-center justify-center shrink-0 font-bold shadow-md shadow-amber-400/30">
@@ -281,7 +293,7 @@ export const Leaderboard: React.FC = () => {
           </div>
         )}
 
-        {/* Guest Banner - Real Firebase Accounts Only */}
+        {/* Guest Info Banner */}
         {!user && (
           <div className="bg-gradient-to-r from-indigo-950/80 via-purple-950/60 to-indigo-950/80 border border-indigo-500/30 p-4 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3.5 backdrop-blur-md relative z-10">
             <div className="flex items-center gap-3">
@@ -290,10 +302,10 @@ export const Leaderboard: React.FC = () => {
               </div>
               <div>
                 <p className="text-xs font-bold text-indigo-300 uppercase tracking-wide font-mono flex items-center gap-1.5">
-                  Google Firebase Real Accounts Only
+                  Active Operative Profile Active
                 </p>
                 <p className="text-xs text-slate-300">
-                  This leaderboard strictly displays real registered community members. Sign in to join the ranks!
+                  Your combat stats and rank are actively recorded. Sign in to link your Google profile across devices!
                 </p>
               </div>
             </div>
@@ -325,7 +337,7 @@ export const Leaderboard: React.FC = () => {
 
           {/* Your Rank Widget */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
-            {isOwner ? (
+            {isCurrentOwner ? (
               <div className="flex items-center gap-4 bg-amber-950/40 border border-amber-500/30 p-3 rounded-xl backdrop-blur-md shrink-0 whitespace-nowrap shadow-lg">
                 <div className="text-right">
                   <p className="text-[10px] text-amber-300 uppercase font-mono font-semibold">Rank Status</p>

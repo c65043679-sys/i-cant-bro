@@ -492,7 +492,12 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
       localStorage.setItem('nexus_spent_xp', curSpentXp.toString());
     } catch (e) {}
 
-    if (!curUser) return;
+    // Determine effective persistent player ID
+    const effectiveUid = curUser?.uid || localStorage.getItem('nexus_player_id') || (() => {
+      const gen = 'player_' + Math.random().toString(36).substring(2, 11);
+      try { localStorage.setItem('nexus_player_id', gen); } catch (e) {}
+      return gen;
+    })();
 
     let activeUName = curProfile?.nickname || curProfile?.displayName || localStorage.getItem('username') || 'Nexus Explorer';
     if (containsProfanity(activeUName) || activeUName.toLowerCase().includes('sarsero')) {
@@ -513,51 +518,55 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const currentLevel = Math.floor(totalScoreVal / 250) + 1;
     const currentLevelTitle = isManhackUser ? 'Recruit' : (isPZ ? 'Recruit' : LEVEL_TITLES[Math.min(currentLevel - 1, LEVEL_TITLES.length - 1)]);
 
-    try {
-      await setDoc(doc(db, 'users', curUser.uid, 'data', 'achievements'), {
-        unlocked: isManhackUser ? {} : unlockedRef.current,
-        progress: isManhackUser ? {} : progressDataRef.current,
-        gamePoints: effectiveGp,
-        gamesPlayed: effectiveGamesPlayedCount,
-        bonusXp: isManhackUser ? 0 : curBonusXp,
-        spentXp: isManhackUser ? 0 : curSpentXp,
-        updatedAt: new Date().toISOString()
-      }, { merge: true });
+    // If signed into Firebase Auth, persist to Firestore
+    if (curUser && curUser.uid) {
+      try {
+        await setDoc(doc(db, 'users', curUser.uid, 'data', 'achievements'), {
+          unlocked: isManhackUser ? {} : unlockedRef.current,
+          progress: isManhackUser ? {} : progressDataRef.current,
+          gamePoints: effectiveGp,
+          gamesPlayed: effectiveGamesPlayedCount,
+          bonusXp: isManhackUser ? 0 : curBonusXp,
+          spentXp: isManhackUser ? 0 : curSpentXp,
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
 
-      const userDocData: any = {
-        uid: curUser.uid,
-        email: curUser.email,
-        photoURL: curUser.photoURL || localStorage.getItem('userpic') || null,
-        nickname: activeUName,
-        displayName: activeUName,
-        totalScore: totalScoreVal,
-        totalXp: currentXp,
-        bonusXp: isManhackUser ? 0 : curBonusXp,
-        gamePoints: effectiveGp,
-        gamesPlayed: effectiveGamesPlayedCount,
-        achievementsCount: isManhackUser ? 0 : (isPZ ? 0 : Object.keys(unlockedRef.current).length),
-        levelTitle: currentLevelTitle,
-        updatedAt: new Date().toISOString()
-      };
+        const userDocData: any = {
+          uid: curUser.uid,
+          email: curUser.email,
+          photoURL: curUser.photoURL || localStorage.getItem('userpic') || null,
+          nickname: activeUName,
+          displayName: activeUName,
+          totalScore: totalScoreVal,
+          totalXp: currentXp,
+          bonusXp: isManhackUser ? 0 : curBonusXp,
+          gamePoints: effectiveGp,
+          gamesPlayed: effectiveGamesPlayedCount,
+          achievementsCount: isManhackUser ? 0 : (isPZ ? 0 : Object.keys(unlockedRef.current).length),
+          levelTitle: currentLevelTitle,
+          updatedAt: new Date().toISOString()
+        };
 
-      await setDoc(doc(db, 'users', curUser.uid), userDocData, { merge: true });
-    } catch (err) {
-      console.warn('Error in flushSave:', err);
+        await setDoc(doc(db, 'users', curUser.uid), userDocData, { merge: true });
+      } catch (err) {
+        console.warn('Error in Firestore save:', err);
+      }
     }
 
-    // Sync to shared server leaderboard API so other website users immediately see progress (owner is permanently excluded)
-    const userEmail = (curUser.email || '').toLowerCase();
-    const isOwnerUser = userEmail === 'alexsarsero@gmail.com' || userEmail === 'c65043679@gmail.com' || (sessionStorage.getItem('isOwner') === 'true') || activeUName === 'Gordon Freeman';
-    if (!isOwnerUser) {
+    // Sync to shared server leaderboard API so all visitors and community members immediately see real player scores
+    const userEmail = (curUser?.email || '').toLowerCase().trim();
+    const isExcludedOwner = userEmail === 'alexsarsero@gmail.com' || activeUName === 'Gordon Freeman';
+    if (!isExcludedOwner) {
       try {
         fetch('/api/leaderboard', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            uid: curUser.uid,
-            email: curUser.email,
-            photoURL: curUser.photoURL || localStorage.getItem('userpic') || null,
+            uid: effectiveUid,
+            email: curUser?.email || null,
+            photoURL: curUser?.photoURL || localStorage.getItem('userpic') || null,
             displayName: activeUName,
+            equippedAvatar: curProfile?.equippedAvatar || localStorage.getItem('nexus_equipped_avatar') || 'initiate_core',
             totalScore: totalScoreVal,
             achievementXp: currentXp,
             gamePoints: effectiveGp,
