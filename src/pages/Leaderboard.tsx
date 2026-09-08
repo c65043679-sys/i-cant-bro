@@ -86,12 +86,21 @@ export const Leaderboard: React.FC = () => {
               if (playerDisplayName === 'Gordon Freeman') return;
 
               const isPoisonZombie = playerDisplayName.toLowerCase().trim() === 'poison zombie' || playerDisplayName.toLowerCase().trim() === 'poision zombie';
+              const isManhack = playerDisplayName.toLowerCase().trim() === 'manhack';
 
-              const finalTot = isCurrent ? (isPoisonZombie ? 5000 : totalScore) : (isPoisonZombie ? 5000 : p.totalScore);
-              const finalGp = isCurrent ? (isPoisonZombie ? 1000 : gamePoints) : p.gamePoints;
-              const finalXp = isCurrent ? (isPoisonZombie ? 4000 : totalXp) : p.achievementXp;
-              const finalGames = isCurrent ? (isPoisonZombie ? 0 : gamesPlayed) : p.gamesPlayed;
-              const finalAchCount = isCurrent ? (isPoisonZombie ? 0 : Object.keys(unlocked).length) : p.achievementsCount;
+              let finalTot = isCurrent ? (isPoisonZombie ? 5000 : totalScore) : (isPoisonZombie ? 5000 : p.totalScore);
+              let finalGp = isCurrent ? (isPoisonZombie ? 1000 : gamePoints) : p.gamePoints;
+              let finalXp = isCurrent ? (isPoisonZombie ? 4000 : totalXp) : p.achievementXp;
+              let finalGames = isCurrent ? (isPoisonZombie ? 0 : gamesPlayed) : p.gamesPlayed;
+              let finalAchCount = isCurrent ? (isPoisonZombie ? 0 : Object.keys(unlocked).length) : p.achievementsCount;
+
+              if (isManhack) {
+                finalTot = 0;
+                finalGp = 0;
+                finalXp = 0;
+                finalGames = 0;
+                finalAchCount = 0;
+              }
 
               realMap.set(p.uid, {
                 uid: p.uid,
@@ -105,7 +114,7 @@ export const Leaderboard: React.FC = () => {
                 gamesPlayed: finalGames,
                 achievementsCount: finalAchCount,
                 isOwner: false,
-                title: isPoisonZombie ? 'Recruit' : (p.title || 'Nexus Member'),
+                title: isManhack ? 'Recruit' : isPoisonZombie ? 'Recruit' : (p.title || 'Nexus Member'),
                 avatarBg: p.avatarBg || 'bg-gradient-to-br from-indigo-500 to-purple-600',
                 isCurrentUser: isCurrent
               });
@@ -134,6 +143,7 @@ export const Leaderboard: React.FC = () => {
           if (playerDisplayName === 'Gordon Freeman') return;
 
           const isPoisonZombie = playerDisplayName.toLowerCase().trim() === 'poison zombie' || playerDisplayName.toLowerCase().trim() === 'poision zombie';
+          const isManhack = playerDisplayName.toLowerCase().trim() === 'manhack';
 
           let pXp = typeof data.totalXp === 'number' ? data.totalXp : (data.achievementsCount || 0) * 150;
           let pGp = typeof data.gamePoints === 'number' ? data.gamePoints : 0;
@@ -145,14 +155,27 @@ export const Leaderboard: React.FC = () => {
             pGp = 1000;
             pGamesPlayed = 0;
             pAchCount = 0;
+          } else if (isManhack) {
+            pXp = 0;
+            pGp = 0;
+            pGamesPlayed = 0;
+            pAchCount = 0;
           }
 
           const isCurrent = user?.uid === playerUid;
-          const finalTot = isCurrent ? (isPoisonZombie ? 5000 : totalScore) : (isPoisonZombie ? 5000 : (pXp + pGp));
-          const finalGp = isCurrent ? (isPoisonZombie ? 1000 : gamePoints) : pGp;
-          const finalXp = isCurrent ? (isPoisonZombie ? 4000 : totalXp) : pXp;
-          const finalGames = isCurrent ? (isPoisonZombie ? 0 : gamesPlayed) : pGamesPlayed;
-          const finalAchCount = isCurrent ? (isPoisonZombie ? 0 : Object.keys(unlocked).length) : pAchCount;
+          let finalTot = isCurrent ? (isPoisonZombie ? 5000 : totalScore) : (isPoisonZombie ? 5000 : (pXp + pGp));
+          let finalGp = isCurrent ? (isPoisonZombie ? 1000 : gamePoints) : pGp;
+          let finalXp = isCurrent ? (isPoisonZombie ? 4000 : totalXp) : pXp;
+          let finalGames = isCurrent ? (isPoisonZombie ? 0 : gamesPlayed) : pGamesPlayed;
+          let finalAchCount = isCurrent ? (isPoisonZombie ? 0 : Object.keys(unlocked).length) : pAchCount;
+
+          if (isManhack) {
+            finalTot = 0;
+            finalGp = 0;
+            finalXp = 0;
+            finalGames = 0;
+            finalAchCount = 0;
+          }
 
           realMap.set(playerUid, {
             uid: playerUid,
@@ -166,7 +189,7 @@ export const Leaderboard: React.FC = () => {
             gamesPlayed: finalGames,
             achievementsCount: finalAchCount,
             isOwner: false,
-            title: isPoisonZombie ? 'Recruit' : (data.levelTitle || 'Nexus Explorer'),
+            title: isManhack ? 'Recruit' : isPoisonZombie ? 'Recruit' : (data.levelTitle || 'Nexus Explorer'),
             avatarBg: 'bg-gradient-to-br from-indigo-500 to-purple-600',
             isCurrentUser: isCurrent
           });
@@ -184,6 +207,7 @@ export const Leaderboard: React.FC = () => {
     if (user && user.uid && !isCurrentOwner) {
       const currentName = getHlAccountName(user.uid, false, user.email, profile?.nickname || profile?.displayName);
       const isCurrentPZ = currentName.toLowerCase().trim() === 'poison zombie';
+      const isCurrentManhack = currentName.toLowerCase().trim() === 'manhack';
 
       const userPayload: LeaderboardPlayer = {
         uid: user.uid,
@@ -191,13 +215,13 @@ export const Leaderboard: React.FC = () => {
         email: user.email,
         photoURL: user.photoURL || localStorage.getItem('userpic') || undefined,
         equippedAvatar: profile?.equippedAvatar || 'initiate_core',
-        totalScore: isCurrentPZ ? 5000 : totalScore,
-        gamePoints: isCurrentPZ ? 1000 : gamePoints,
-        achievementXp: isCurrentPZ ? 4000 : totalXp,
-        gamesPlayed: isCurrentPZ ? 0 : gamesPlayed,
-        achievementsCount: isCurrentPZ ? 0 : Object.keys(unlocked).length,
+        totalScore: isCurrentManhack ? 0 : (isCurrentPZ ? 5000 : totalScore),
+        gamePoints: isCurrentManhack ? 0 : (isCurrentPZ ? 1000 : gamePoints),
+        achievementXp: isCurrentManhack ? 0 : (isCurrentPZ ? 4000 : totalXp),
+        gamesPlayed: isCurrentManhack ? 0 : (isCurrentPZ ? 0 : gamesPlayed),
+        achievementsCount: isCurrentManhack ? 0 : (isCurrentPZ ? 0 : Object.keys(unlocked).length),
         isOwner: false,
-        title: isCurrentPZ ? 'Recruit' : levelTitle,
+        title: isCurrentManhack ? 'Recruit' : isCurrentPZ ? 'Recruit' : levelTitle,
         avatarBg: 'bg-gradient-to-br from-indigo-500 to-purple-600',
         isCurrentUser: true
       };

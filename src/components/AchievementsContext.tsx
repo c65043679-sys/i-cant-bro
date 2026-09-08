@@ -287,9 +287,13 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   const [gamePoints, setGamePoints] = useState<number>(() => {
     try {
+      const uname = (localStorage.getItem('username') || '').toLowerCase().trim();
+      if (uname === 'manhack') {
+        localStorage.setItem('nexus_game_points', '0');
+        return 0;
+      }
       const saved = localStorage.getItem('nexus_game_points');
       const val = saved ? parseInt(saved, 10) || 0 : 0;
-      const uname = (localStorage.getItem('username') || '').toLowerCase().trim();
       if (uname === 'poison zombie' || uname === 'poision zombie') {
         return Math.max(val, 1000);
       }
@@ -301,6 +305,11 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   const [gamesPlayed, setGamesPlayed] = useState<number>(() => {
     try {
+      const uname = (localStorage.getItem('username') || '').toLowerCase().trim();
+      if (uname === 'manhack') {
+        localStorage.setItem('nexus_games_played', '0');
+        return 0;
+      }
       const saved = localStorage.getItem('nexus_games_played');
       return saved ? parseInt(saved, 10) || 0 : 0;
     } catch (e) {
@@ -310,6 +319,11 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   const [spentXp, setSpentXp] = useState<number>(() => {
     try {
+      const uname = (localStorage.getItem('username') || '').toLowerCase().trim();
+      if (uname === 'manhack') {
+        localStorage.setItem('nexus_spent_xp', '0');
+        return 0;
+      }
       const saved = localStorage.getItem('nexus_spent_xp');
       return saved ? parseInt(saved, 10) || 0 : 0;
     } catch (e) {
@@ -319,6 +333,11 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   const [bonusXp, setBonusXp] = useState<number>(() => {
     try {
+      const uname = (localStorage.getItem('username') || '').toLowerCase().trim();
+      if (uname === 'manhack') {
+        localStorage.setItem('nexus_bonus_xp', '0');
+        return 0;
+      }
       const saved = localStorage.getItem('nexus_bonus_xp');
       return saved ? parseInt(saved, 10) || 0 : 0;
     } catch (e) {
@@ -379,38 +398,42 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
           const mergedProgress = { ...remoteProgress, ...progressDataRef.current };
           const activeUname = (profile?.nickname || profile?.displayName || localStorage.getItem('username') || '').toLowerCase().trim();
           const isPZ = activeUname === 'poison zombie' || activeUname === 'poision zombie';
-          let maxGamePoints = Math.max(
+          const isManhack = activeUname === 'manhack';
+          let maxGamePoints = isManhack ? 0 : Math.max(
             typeof remoteData.gamePoints === 'number' ? remoteData.gamePoints : 0, 
             parseInt(localStorage.getItem('nexus_game_points') || '0', 10),
             gamePoints
           );
           if (isPZ) maxGamePoints = Math.max(maxGamePoints, 1000);
-          const maxGamesPlayed = Math.max(
+          const maxGamesPlayed = isManhack ? 0 : Math.max(
             typeof remoteData.gamesPlayed === 'number' ? remoteData.gamesPlayed : 0, 
             parseInt(localStorage.getItem('nexus_games_played') || '0', 10),
             gamesPlayed
           );
-          const maxBonusXp = Math.max(
+          const maxBonusXp = isManhack ? 0 : Math.max(
             typeof remoteData.bonusXp === 'number' ? remoteData.bonusXp : 0,
             parseInt(localStorage.getItem('nexus_bonus_xp') || '0', 10),
             bonusXp
           );
-          const remoteSpentXp = typeof remoteData.spentXp === 'number' 
+          const remoteSpentXp = isManhack ? 0 : (typeof remoteData.spentXp === 'number' 
             ? remoteData.spentXp 
-            : parseInt(localStorage.getItem('nexus_spent_xp') || '0', 10);
+            : parseInt(localStorage.getItem('nexus_spent_xp') || '0', 10));
 
-          unlockedRef.current = mergedUnlocked;
-          progressDataRef.current = mergedProgress;
-          setUnlocked(mergedUnlocked);
-          setProgressData(mergedProgress);
+          const finalUnlocked = isManhack ? {} : mergedUnlocked;
+          const finalProgress = isManhack ? {} : mergedProgress;
+
+          unlockedRef.current = finalUnlocked;
+          progressDataRef.current = finalProgress;
+          setUnlocked(finalUnlocked);
+          setProgressData(finalProgress);
           setGamePoints(maxGamePoints);
           setGamesPlayed(maxGamesPlayed);
           setBonusXp(maxBonusXp);
           setSpentXp(remoteSpentXp);
 
           try {
-            localStorage.setItem('nexus_achievements', JSON.stringify(mergedUnlocked));
-            localStorage.setItem('nexus_achievements_progress', JSON.stringify(mergedProgress));
+            localStorage.setItem('nexus_achievements', JSON.stringify(finalUnlocked));
+            localStorage.setItem('nexus_achievements_progress', JSON.stringify(finalProgress));
             localStorage.setItem('nexus_game_points', maxGamePoints.toString());
             localStorage.setItem('nexus_games_played', maxGamesPlayed.toString());
             localStorage.setItem('nexus_bonus_xp', maxBonusXp.toString());
@@ -435,6 +458,7 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   const activeName = profile?.nickname || profile?.displayName || localStorage.getItem('username') || '';
   const isPoisonZombie = activeName.toLowerCase().trim() === 'poison zombie' || activeName.toLowerCase().trim() === 'poision zombie';
+  const isManhack = activeName.toLowerCase().trim() === 'manhack';
 
   // Calculate XP and Level
   const baseTotalXp = Object.keys(unlocked).reduce((acc, id) => {
@@ -442,12 +466,13 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
     return acc + (ach ? ach.xp : 0);
   }, 0);
 
-  const totalXp = isPoisonZombie ? 4000 : (baseTotalXp + bonusXp);
-  const availableXp = Math.max(0, totalXp - spentXp);
-  const totalScore = isPoisonZombie ? 5000 : (totalXp + gamePoints);
-  const effectiveGamesPlayed = isPoisonZombie ? 0 : gamesPlayed;
+  const totalXp = isManhack ? 0 : (isPoisonZombie ? 4000 : (baseTotalXp + bonusXp));
+  const availableXp = isManhack ? 0 : Math.max(0, totalXp - spentXp);
+  const effectiveGamePoints = isManhack ? 0 : gamePoints;
+  const totalScore = isManhack ? 0 : (isPoisonZombie ? 5000 : (totalXp + effectiveGamePoints));
+  const effectiveGamesPlayed = isManhack ? 0 : (isPoisonZombie ? 0 : gamesPlayed);
   const level = Math.floor(totalScore / 250) + 1;
-  const levelTitle = isPoisonZombie ? 'Recruit' : LEVEL_TITLES[Math.min(level - 1, LEVEL_TITLES.length - 1)];
+  const levelTitle = isManhack ? 'Recruit' : (isPoisonZombie ? 'Recruit' : LEVEL_TITLES[Math.min(level - 1, LEVEL_TITLES.length - 1)]);
 
   // Immediate save helper to sync state to Firestore and localStorage
   const flushSave = useCallback(async () => {
@@ -474,27 +499,28 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
       activeUName = 'Nexus Explorer';
     }
     const isPZ = activeUName.toLowerCase().trim() === 'poison zombie' || activeUName.toLowerCase().trim() === 'poision zombie';
+    const isManhackUser = activeUName.toLowerCase().trim() === 'manhack';
 
     const baseCurrentXp = Object.keys(unlockedRef.current).reduce((acc, id) => {
       const ach = ACHIEVEMENTS_CATALOG.find(a => a.id === id);
       return acc + (ach ? ach.xp : 0);
     }, 0);
 
-    const currentXp = isPZ ? 4000 : (baseCurrentXp + curBonusXp);
-    const effectiveGp = isPZ ? Math.min(curGamePoints, 1000) : curGamePoints;
-    const totalScoreVal = isPZ ? 5000 : (currentXp + effectiveGp);
-    const effectiveGamesPlayedCount = isPZ ? 0 : curGamesPlayed;
+    const currentXp = isManhackUser ? 0 : (isPZ ? 4000 : (baseCurrentXp + curBonusXp));
+    const effectiveGp = isManhackUser ? 0 : (isPZ ? Math.min(curGamePoints, 1000) : curGamePoints);
+    const totalScoreVal = isManhackUser ? 0 : (isPZ ? 5000 : (currentXp + effectiveGp));
+    const effectiveGamesPlayedCount = isManhackUser ? 0 : (isPZ ? 0 : curGamesPlayed);
     const currentLevel = Math.floor(totalScoreVal / 250) + 1;
-    const currentLevelTitle = isPZ ? 'Recruit' : LEVEL_TITLES[Math.min(currentLevel - 1, LEVEL_TITLES.length - 1)];
+    const currentLevelTitle = isManhackUser ? 'Recruit' : (isPZ ? 'Recruit' : LEVEL_TITLES[Math.min(currentLevel - 1, LEVEL_TITLES.length - 1)]);
 
     try {
       await setDoc(doc(db, 'users', curUser.uid, 'data', 'achievements'), {
-        unlocked: unlockedRef.current,
-        progress: progressDataRef.current,
+        unlocked: isManhackUser ? {} : unlockedRef.current,
+        progress: isManhackUser ? {} : progressDataRef.current,
         gamePoints: effectiveGp,
         gamesPlayed: effectiveGamesPlayedCount,
-        bonusXp: curBonusXp,
-        spentXp: curSpentXp,
+        bonusXp: isManhackUser ? 0 : curBonusXp,
+        spentXp: isManhackUser ? 0 : curSpentXp,
         updatedAt: new Date().toISOString()
       }, { merge: true });
 
@@ -506,10 +532,10 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
         displayName: activeUName,
         totalScore: totalScoreVal,
         totalXp: currentXp,
-        bonusXp: curBonusXp,
+        bonusXp: isManhackUser ? 0 : curBonusXp,
         gamePoints: effectiveGp,
         gamesPlayed: effectiveGamesPlayedCount,
-        achievementsCount: isPZ ? 0 : Object.keys(unlockedRef.current).length,
+        achievementsCount: isManhackUser ? 0 : (isPZ ? 0 : Object.keys(unlockedRef.current).length),
         levelTitle: currentLevelTitle,
         updatedAt: new Date().toISOString()
       };
@@ -536,7 +562,7 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
             achievementXp: currentXp,
             gamePoints: effectiveGp,
             gamesPlayed: effectiveGamesPlayedCount,
-            achievementsCount: isPZ ? 0 : Object.keys(unlockedRef.current).length,
+            achievementsCount: isManhackUser ? 0 : (isPZ ? 0 : Object.keys(unlockedRef.current).length),
             title: currentLevelTitle,
             isOwner: false
           })
@@ -544,6 +570,25 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
       } catch (e) {}
     }
   }, []);
+
+  // Automatic reset if active account is Manhack
+  useEffect(() => {
+    if (isManhack) {
+      try {
+        localStorage.setItem('nexus_game_points', '0');
+        localStorage.setItem('nexus_bonus_xp', '0');
+        localStorage.setItem('nexus_spent_xp', '0');
+        localStorage.setItem('nexus_achievements', '{}');
+        localStorage.setItem('nexus_achievements_progress', '{}');
+      } catch (e) {}
+      setGamePoints(0);
+      setBonusXp(0);
+      setSpentXp(0);
+      setUnlocked({});
+      setProgressData({});
+      flushSave();
+    }
+  }, [isManhack, flushSave]);
 
   // Sync to localStorage on every change and debounce Firestore save (800ms)
   useEffect(() => {

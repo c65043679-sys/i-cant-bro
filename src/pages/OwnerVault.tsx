@@ -179,6 +179,20 @@ export const OwnerVault: React.FC = () => {
     }
   };
 
+  const handleResetManhack = async () => {
+    try {
+      await fetch('/api/leaderboard/reset-player', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetName: 'Manhack' })
+      });
+      playRetroSound('laser');
+      showActionToast(`🎯 Manhack account XP and game points reset to 0.`);
+    } catch (e) {
+      showActionToast(`❌ Failed to reset Manhack account`);
+    }
+  };
+
   const handleForceSync = async () => {
     await flushSave();
     playRetroSound('coin');
@@ -905,6 +919,25 @@ export const OwnerVault: React.FC = () => {
                     className="w-full py-2.5 bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-300 font-bold text-xs rounded-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
                   >
                     <Trash2 className="w-3.5 h-3.5" /> Wipe Progress
+                  </button>
+                </div>
+
+                {/* Reset Manhack Account */}
+                <div className="bg-black/50 border border-amber-500/20 rounded-2xl p-4 flex flex-col justify-between space-y-3">
+                  <div>
+                    <p className="text-sm font-bold text-white flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-amber-400" />
+                      Reset Manhack Account
+                    </p>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Wipe all XP, game points, and standing for player "Manhack" back to 0.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleResetManhack}
+                    className="w-full py-2.5 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 font-bold text-xs rounded-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" /> Reset Manhack Stats
                   </button>
                 </div>
               </div>

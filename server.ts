@@ -249,8 +249,54 @@ async function startServer() {
   // GET /api/leaderboard - Returns real registered website users only (owner permanently excluded)
   app.get("/api/leaderboard", (req, res) => {
     const rawPlayers = readLeaderboardData();
-    const players = rawPlayers.filter((p: any) => !isOwnerRecord(p));
+    const players = rawPlayers
+      .filter((p: any) => !isOwnerRecord(p))
+      .map((p: any) => {
+        if ((p.displayName || "").toLowerCase().trim() === "manhack") {
+          return {
+            ...p,
+            totalScore: 0,
+            gamePoints: 0,
+            achievementXp: 0,
+            gamesPlayed: 0,
+            achievementsCount: 0,
+            title: "Recruit"
+          };
+        }
+        return p;
+      });
     res.json({ players });
+  });
+
+  // POST /api/leaderboard/reset-player - Resets target player account XP and points
+  app.post("/api/leaderboard/reset-player", (req, res) => {
+    const { targetName } = req.body || {};
+    const nameToReset = (targetName || "Manhack").toLowerCase().trim();
+    const currentPlayers = readLeaderboardData();
+    let updated = false;
+
+    const modified = currentPlayers.map((p: any) => {
+      const pName = (p.displayName || "").toLowerCase().trim();
+      if (pName === nameToReset) {
+        updated = true;
+        return {
+          ...p,
+          totalScore: 0,
+          gamePoints: 0,
+          achievementXp: 0,
+          gamesPlayed: 0,
+          achievementsCount: 0,
+          title: "Recruit",
+          updatedAt: new Date().toISOString()
+        };
+      }
+      return p;
+    });
+
+    if (updated) {
+      writeLeaderboardData(modified);
+    }
+    res.json({ success: true, updated, players: modified.filter((p: any) => !isOwnerRecord(p)) });
   });
 
   // POST /api/leaderboard - Upserts real players (owner is permanently excluded from competition standings)
@@ -279,31 +325,42 @@ async function startServer() {
     }
 
     const finalName = body.displayName || "Combine Soldier";
+    const isManhack = finalName.toLowerCase().trim() === "manhack";
     const isPoisonZombie =
       finalName.toLowerCase().trim() === "poison zombie" ||
       finalName.toLowerCase().trim() === "poision zombie";
 
-    const totalScore = isPoisonZombie
+    const totalScore = isManhack
+      ? 0
+      : isPoisonZombie
       ? 5000
       : typeof body.totalScore === "number"
       ? body.totalScore
       : (body.achievementXp || 0) + (body.gamePoints || 0);
-    const gamePoints = isPoisonZombie
+    const gamePoints = isManhack
+      ? 0
+      : isPoisonZombie
       ? 1000
       : typeof body.gamePoints === "number"
       ? body.gamePoints
       : 0;
-    const achievementXp = isPoisonZombie
+    const achievementXp = isManhack
+      ? 0
+      : isPoisonZombie
       ? 4000
       : typeof body.achievementXp === "number"
       ? body.achievementXp
       : 0;
-    const gamesPlayed = isPoisonZombie
+    const gamesPlayed = isManhack
+      ? 0
+      : isPoisonZombie
       ? 0
       : typeof body.gamesPlayed === "number"
       ? body.gamesPlayed
       : 0;
-    const achievementsCount = isPoisonZombie
+    const achievementsCount = isManhack
+      ? 0
+      : isPoisonZombie
       ? 0
       : typeof body.achievementsCount === "number"
       ? body.achievementsCount
@@ -320,7 +377,7 @@ async function startServer() {
       achievementXp,
       gamesPlayed,
       achievementsCount,
-      title: isPoisonZombie ? "Recruit" : body.title || "Nexus Member",
+      title: isManhack ? "Recruit" : isPoisonZombie ? "Recruit" : body.title || "Nexus Member",
       avatarBg: body.avatarBg || "bg-gradient-to-br from-indigo-500 to-purple-600",
       isOwner: false,
       updatedAt: new Date().toISOString()
