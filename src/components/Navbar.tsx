@@ -141,27 +141,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onSearch }) => {
           </span>
         </Link>
 
-        {isOwner && (
-          <Link
-            to="/owner-vault"
-            title="Owner Overlord Vault & Control Deck"
-            onClick={() => {
-              if (document.activeElement?.tagName?.toLowerCase() === 'iframe') {
-                try { (document.activeElement as HTMLElement)?.blur(); window.focus(); } catch (e) {}
-              }
-            }}
-            onPointerDown={() => {
-              if (document.activeElement?.tagName?.toLowerCase() === 'iframe') {
-                try { (document.activeElement as HTMLElement)?.blur(); window.focus(); } catch (e) {}
-              }
-            }}
-            className="flex items-center gap-1 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full text-[11px] sm:text-xs font-bold transition-all active:scale-95 shadow-md bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 text-black shadow-amber-500/10 hover:brightness-110 cursor-pointer"
-          >
-            <Crown className="w-3.5 h-3.5 text-amber-950 fill-amber-950 shrink-0" />
-            <span className="whitespace-nowrap">Owner Vault</span>
-          </Link>
-        )}
-
         {user ? (
           <div className="flex items-center gap-2 ml-1">
             <div className="hidden lg:block text-right">

@@ -6,7 +6,6 @@ import { Home } from './pages/Home';
 import { Play } from './pages/Play';
 import { Settings } from './pages/Settings';
 import { Updates } from './pages/Updates';
-import { OwnerVault } from './pages/OwnerVault';
 import { Category } from './types';
 import { AuthProvider, useAuth } from './components/AuthContext';
 import { SettingsProvider, useSettings } from './components/SettingsContext';
@@ -127,7 +126,6 @@ function AppContent() {
               <Route path="/leaderboard" element={<Leaderboard />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/updates" element={<Updates />} />
-              <Route path="/owner-vault" element={<OwnerVault />} />
             </Routes>
           </div>
         </main>

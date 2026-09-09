@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutGrid, Flame, Car, Gamepad, Puzzle, User as UserIcon, LogIn, LogOut, Skull, Trophy, Star, Settings, Lock, Unlock, History, PlusCircle, Crown, BarChart3, Medal, Package } from 'lucide-react';
+import { LayoutGrid, Flame, Car, Gamepad, Puzzle, User as UserIcon, LogIn, LogOut, Skull, Trophy, Star, Settings, Lock, Unlock, History, PlusCircle, BarChart3, Medal, Package } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Category } from '../types';
 import { useAuth } from './AuthContext';
@@ -145,20 +145,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeCategory, onCategoryChan
             <PlusCircle className="w-5 h-5 text-[var(--accent)]" />
             <span className="text-sm font-medium">Request a Game</span>
           </a>
-
-          {isOwner && (
-            <Link 
-              to="/owner-vault"
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
-                location.pathname === '/owner-vault'
-                  ? 'bg-gradient-to-r from-amber-500/20 to-yellow-500/10 text-amber-300 border border-amber-500/30 font-bold'
-                  : 'text-amber-400/80 border border-transparent hover:text-amber-300 hover:bg-amber-500/10'
-              }`}
-            >
-              <Crown className="w-5 h-5 text-amber-400" />
-              <span className="text-sm font-bold">Owner Vault ⚡</span>
-            </Link>
-          )}
 
           <Link 
             to="/settings"
