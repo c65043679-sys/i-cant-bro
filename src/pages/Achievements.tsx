@@ -56,13 +56,15 @@ const TIER_BADGES: Record<string, string> = {
 };
 
 export const Achievements: React.FC = () => {
-  const { isOwner } = useAuth();
+  const { isOwner, user } = useAuth();
   const { unlocked, totalXp, level, levelTitle, unlockAchievement, unlockAllAchievements, getProgress } = useAchievements();
   const [filter, setFilter] = useState<'all' | 'unlocked' | 'locked' | 'secret'>('all');
 
   useEffect(() => {
-    try { unlockAchievement('vault_visitor'); } catch (e) {}
-  }, [unlockAchievement]);
+    if (user) {
+      try { unlockAchievement('vault_visitor'); } catch (e) {}
+    }
+  }, [user, unlockAchievement]);
 
   const unlockedCount = Object.keys(unlocked).length;
   const totalCount = ACHIEVEMENTS_CATALOG.length;

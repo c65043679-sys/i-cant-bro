@@ -1,12 +1,12 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, signInWithCredential } from 'firebase/auth';
 import { auth, db } from '../lib/firebase';
-import { doc, getDoc, setDoc, serverTimestamp, updateDoc, arrayUnion, arrayRemove, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, updateDoc, arrayUnion, arrayRemove, onSnapshot, increment } from 'firebase/firestore';
 import { containsProfanity } from '../utils/profanityFilter';
 import { generateGamerTag } from '../utils/nameGenerator';
 import { AVATARS_CATALOG } from '../data/avatarsData';
 
-interface UserProfile {
+export interface UserProfile {
   uid: string;
   displayName: string;
   email: string | null;
@@ -16,9 +16,10 @@ interface UserProfile {
   equippedAvatar?: string;
   unlockedAvatars?: string[];
   favorites: string[];
+  totalPlayTime?: number;
 }
 
-interface AuthContextType {
+export interface AuthContextType {
   user: User | null;
   profile: UserProfile | null;
   loading: boolean;
@@ -32,6 +33,7 @@ interface AuthContextType {
   setOwnerStatus: (status: boolean) => void;
   toggleFavorite: (gameId: string) => Promise<void>;
   updateProfile: (data: Partial<UserProfile>) => Promise<void>;
+  addPlayTime: (seconds: number) => Promise<void>;
   equipAvatar: (avatarId: string) => Promise<void>;
   unlockAvatar: (avatarId: string) => Promise<void>;
   lockAvatar: (avatarId: string) => Promise<void>;
@@ -88,6 +90,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       let guestUnlocked: string[] = ['initiate_core'];
       if (isOwnerUnlocked) guestUnlocked.push('sovereign_crown');
       let guestEquipped = isOwnerUnlocked ? 'sovereign_crown' : 'initiate_core';
+      const guestPlayTime = parseInt(localStorage.getItem('nexus_total_play_time') || '0', 10);
 
       try {
         const savedFavs = localStorage.getItem('nexus_favorites');
@@ -107,7 +110,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         nickname: guestName,
         equippedAvatar: guestEquipped,
         unlockedAvatars: guestUnlocked,
-        favorites: guestFavs
+        favorites: guestFavs,
+        totalPlayTime: guestPlayTime
       });
       return;
     }
@@ -129,6 +133,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         let localFavs: string[] = [];
         let localUnlocked: string[] = ['initiate_core'];
         let localEquipped = isUserOwner ? 'sovereign_crown' : 'initiate_core';
+        const localPlayTime = parseInt(localStorage.getItem('nexus_total_play_time') || '0', 10);
 
         if (isUserOwner) {
           localUnlocked.push('sovereign_crown');
@@ -155,7 +160,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           photoURL: user.photoURL,
           equippedAvatar: localEquipped,
           unlockedAvatars: localUnlocked,
-          favorites: localFavs
+          favorites: localFavs,
+          totalPlayTime: localPlayTime
         });
 
         try {
@@ -172,6 +178,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               equippedAvatar: localEquipped,
               unlockedAvatars: localUnlocked,
               favorites: [],
+              totalPlayTime: localPlayTime,
               createdAt: serverTimestamp(),
               updatedAt: serverTimestamp(),
             };
@@ -208,8 +215,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               const snapData = docSnap.data();
               const baseUnlocked = ['initiate_core', ...(isUserOwner ? ['sovereign_crown'] : [])];
               const finalUnlocked = Array.from(new Set([...baseUnlocked, ...(snapData.unlockedAvatars || [])]));
+              const remotePlayTime = typeof snapData.totalPlayTime === 'number'
+                ? snapData.totalPlayTime
+                : parseInt(localStorage.getItem('nexus_total_play_time') || '0', 10);
+              try {
+                localStorage.setItem('nexus_total_play_time', remotePlayTime.toString());
+              } catch (e) {}
+
               setProfile({
                 ...snapData,
+                totalPlayTime: remotePlayTime,
                 unlockedAvatars: finalUnlocked,
                 equippedAvatar: snapData.equippedAvatar || (isUserOwner ? 'sovereign_crown' : 'initiate_core')
               } as UserProfile);
@@ -226,6 +241,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         let guestUnlocked: string[] = ['initiate_core'];
         if (isOwnerUnlocked) guestUnlocked.push('sovereign_crown');
         let guestEquipped = isOwnerUnlocked ? 'sovereign_crown' : 'initiate_core';
+        const guestPlayTime = parseInt(localStorage.getItem('nexus_total_play_time') || '0', 10);
 
         try {
           const savedFavs = localStorage.getItem('nexus_favorites');
@@ -246,7 +262,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           nickname: guestName,
           equippedAvatar: guestEquipped,
           unlockedAvatars: guestUnlocked,
-          favorites: guestFavs
+          favorites: guestFavs,
+          totalPlayTime: guestPlayTime
         });
         if (unsubscribeProfile) {
           unsubscribeProfile();
@@ -290,6 +307,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem('isOwner');
     sessionStorage.removeItem('isOwner');
     setIsOwnerUnlocked(false);
+
+    try {
+      localStorage.removeItem('username');
+      localStorage.removeItem('userpic');
+      localStorage.removeItem('nexus_achievements');
+      localStorage.removeItem('nexus_achievements_progress');
+      localStorage.removeItem('nexus_game_points');
+      localStorage.removeItem('nexus_games_played');
+      localStorage.removeItem('nexus_bonus_xp');
+      localStorage.removeItem('nexus_spent_xp');
+      localStorage.removeItem('nexus_total_play_time');
+      window.dispatchEvent(new Event('nexus_achievements_cleared'));
+    } catch (e) {}
+
     if (auth) {
       return signOut(auth);
     }
@@ -406,6 +437,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       displayName: chosenName,
       updatedAt: serverTimestamp()
     }, { merge: true });
+  };
+
+  const addPlayTime = async (seconds: number) => {
+    if (seconds <= 0) return;
+
+    const currentTotal = profile?.totalPlayTime ?? parseInt(localStorage.getItem('nexus_total_play_time') || '0', 10);
+    const newTotal = currentTotal + seconds;
+
+    try {
+      localStorage.setItem('nexus_total_play_time', newTotal.toString());
+    } catch (e) {}
+
+    setProfile(prev => prev ? {
+      ...prev,
+      totalPlayTime: (prev.totalPlayTime || 0) + seconds
+    } : {
+      uid: user?.uid || 'guest',
+      displayName: localStorage.getItem('username') || 'Nexus Guest',
+      email: user?.email || null,
+      photoURL: user?.photoURL || null,
+      favorites: [],
+      totalPlayTime: newTotal
+    });
+
+    if (user && db) {
+      try {
+        const userRef = doc(db, 'users', user.uid);
+        await setDoc(userRef, {
+          totalPlayTime: increment(seconds),
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+      } catch (err) {
+        console.warn('Error saving play time to Firestore:', err);
+      }
+    }
   };
 
   const equipAvatar = async (avatarId: string) => {
@@ -560,6 +626,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setOwnerStatus,
       toggleFavorite,
       updateProfile,
+      addPlayTime,
       equipAvatar,
       unlockAvatar,
       lockAvatar,

@@ -4,6 +4,7 @@ import { useAuth } from '../components/AuthContext';
 import { useSettings, TAB_CLOAK_PRESETS, CANVAS_THEMES } from '../components/SettingsContext';
 import { useAchievements } from '../components/AchievementsContext';
 import { generateGamerTag, getHlAccountName } from '../utils/nameGenerator';
+import { formatPlayTime, formatPlayTimeDetailed } from '../hooks/usePlayTimeTracker';
 import { 
   User as UserIcon, 
   Save, 
@@ -25,7 +26,10 @@ import {
   Eye,
   Trash2,
   AlertTriangle,
-  Crown
+  Crown,
+  Clock,
+  Trophy,
+  Gamepad2
 } from 'lucide-react';
 
 const ACCENT_HUES = [
@@ -41,9 +45,9 @@ const ACCENT_HUES = [
 ];
 
 export const Settings: React.FC = () => {
-  const { user, profile, updateProfile, isOwner } = useAuth();
+  const { user, profile, updateProfile, isOwner, signIn } = useAuth();
   const { settings, updateSetting, updateSettings, resetSettings, triggerPanic: rawTriggerPanic } = useSettings();
-  const { unlockAchievement, wipeAllProgress } = useAchievements();
+  const { unlockAchievement, wipeAllProgress, gamesPlayed, levelTitle } = useAchievements();
 
   const triggerPanic = () => {
     try { unlockAchievement('panic_agent'); } catch (e) {}
@@ -65,6 +69,8 @@ export const Settings: React.FC = () => {
     setIsWipingProgress(true);
     try {
       await wipeAllProgress();
+      await updateProfile({ totalPlayTime: 0 });
+      localStorage.removeItem('nexus_total_play_time');
       setMessage('All account progress, achievements, game points, and leaderboard standings have been wiped.');
       setShowWipeModal(false);
       setTimeout(() => setMessage(''), 5000);
@@ -528,10 +534,112 @@ export const Settings: React.FC = () => {
                     <span className="text-emerald-400 font-bold">Real Player Account</span>
                   </div>
                 </div>
+
+                {/* Profile Statistics: Total Play Time */}
+                <div className="pt-2 border-t border-white/10 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                      <Activity className="w-3.5 h-3.5 text-[var(--accent)]" />
+                      Profile Statistics
+                    </span>
+                    <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      Live
+                    </span>
+                  </div>
+
+                  {/* Total Play Time Featured Card */}
+                  <div className="p-4 rounded-2xl bg-gradient-to-br from-[var(--accent)]/15 via-black/40 to-black/60 border border-[var(--accent)]/30 relative overflow-hidden group">
+                    <div className="absolute -right-3 -top-3 w-20 h-20 bg-[var(--accent)]/10 rounded-full blur-xl pointer-events-none group-hover:bg-[var(--accent)]/20 transition-all" />
+                    <div className="flex items-start justify-between relative z-10">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-[var(--accent)]" />
+                          Total Play Time
+                        </p>
+                        <p className="text-2xl font-black text-white font-mono mt-1 tracking-tight">
+                          {formatPlayTime(profile?.totalPlayTime || 0)}
+                        </p>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          {formatPlayTimeDetailed(profile?.totalPlayTime || 0)}
+                        </p>
+                      </div>
+                      <div className="w-9 h-9 rounded-xl bg-[var(--accent)]/20 border border-[var(--accent)]/40 flex items-center justify-center text-[var(--accent)] shadow-sm">
+                        <Clock className="w-4 h-4" />
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-2.5 pt-2 border-t border-white/5 relative z-10">
+                      Accumulated time spent playing games in the Play view
+                    </p>
+                  </div>
+
+                  {/* Additional Profile Metrics */}
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="p-3 rounded-xl bg-black/40 border border-white/5 space-y-0.5">
+                      <p className="text-[10px] text-slate-400 font-bold uppercase flex items-center gap-1">
+                        <Gamepad2 className="w-3 h-3 text-cyan-400" />
+                        Games Played
+                      </p>
+                      <p className="text-sm font-black text-white font-mono">{gamesPlayed} Titles</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-black/40 border border-white/5 space-y-0.5">
+                      <p className="text-[10px] text-slate-400 font-bold uppercase flex items-center gap-1">
+                        <Trophy className="w-3 h-3 text-amber-400" />
+                        Rank Title
+                      </p>
+                      <p className="text-xs font-bold text-amber-300 truncate">{levelTitle}</p>
+                    </div>
+                  </div>
+                </div>
               </div>
             ) : (
-              <div className="text-center py-4 space-y-3">
-                <p className="text-xs text-slate-400">Sign in to sync your saved games and custom settings across devices.</p>
+              <div className="space-y-4">
+                <div className="p-4 rounded-2xl bg-black/40 border border-white/5 text-xs space-y-2">
+                  <div className="flex justify-between text-slate-400">
+                    <span>Current Session</span>
+                    <span className="font-mono text-white text-[11px]">Guest Explorer</span>
+                  </div>
+                  <div className="flex justify-between text-slate-400">
+                    <span>Device Alias</span>
+                    <span className="text-[var(--accent)] font-bold">{profile?.displayName || 'Nexus Guest'}</span>
+                  </div>
+                </div>
+
+                {/* Guest Profile Statistics: Total Play Time */}
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-[var(--accent)]/15 via-black/40 to-black/60 border border-[var(--accent)]/30 relative overflow-hidden group">
+                  <div className="absolute -right-3 -top-3 w-20 h-20 bg-[var(--accent)]/10 rounded-full blur-xl pointer-events-none group-hover:bg-[var(--accent)]/20 transition-all" />
+                  <div className="flex items-start justify-between relative z-10">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-[var(--accent)]" />
+                        Total Play Time
+                      </p>
+                      <p className="text-2xl font-black text-white font-mono mt-1 tracking-tight">
+                        {formatPlayTime(profile?.totalPlayTime || 0)}
+                      </p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        {formatPlayTimeDetailed(profile?.totalPlayTime || 0)}
+                      </p>
+                    </div>
+                    <div className="w-9 h-9 rounded-xl bg-[var(--accent)]/20 border border-[var(--accent)]/40 flex items-center justify-center text-[var(--accent)]">
+                      <Clock className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-2.5 pt-2 border-t border-white/5 relative z-10">
+                    Recorded locally for this guest session
+                  </p>
+                </div>
+
+                <div className="text-center py-2 space-y-2.5">
+                  <p className="text-xs text-slate-400">Sign in to permanently sync your Total Play Time and achievements across all your devices.</p>
+                  <button
+                    onClick={() => signIn()}
+                    className="w-full py-2.5 px-4 rounded-xl bg-[var(--accent)] hover:brightness-110 text-black font-black text-xs transition-all cursor-pointer shadow-lg shadow-[var(--accent)]/20 flex items-center justify-center gap-2"
+                  >
+                    <UserIcon className="w-4 h-4" />
+                    Sign In with Google
+                  </button>
+                </div>
               </div>
             )}
           </div>

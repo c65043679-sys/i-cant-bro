@@ -1,10 +1,11 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ChevronLeft, Info, Gamepad2, Maximize2, Minimize2, Save, CheckCircle2, Heart, Zap, Moon, ZoomIn, Crown, ShieldAlert } from 'lucide-react';
+import { ChevronLeft, Info, Gamepad2, Maximize2, Minimize2, Save, CheckCircle2, Heart, Zap, Moon, ZoomIn, Crown, ShieldAlert, Clock } from 'lucide-react';
 import { getAllGames } from '../utils/getAllGames';
 import { useAuth } from '../components/AuthContext';
 import { useSettings } from '../components/SettingsContext';
 import { useAchievements } from '../components/AchievementsContext';
+import { usePlayTimeTracker } from '../hooks/usePlayTimeTracker';
 import { db } from '../lib/firebase';
 import { doc, setDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
 import { GameCard } from '../components/GameCard';
@@ -14,6 +15,7 @@ export const Play: React.FC = () => {
   const { user, profile, toggleFavorite, isOwner } = useAuth();
   const { settings, updateSetting, triggerPanic } = useSettings();
   const { unlockAchievement, incrementProgress, recordGamePlay, addGameTimePoints } = useAchievements();
+  const { sessionSeconds, formattedSessionTime, formattedTotalPlayTime } = usePlayTimeTracker();
   const allGames = useMemo(() => getAllGames(), []);
   const game = useMemo(() => {
     return allGames.find((g) => g.id === id);
@@ -338,6 +340,15 @@ export const Play: React.FC = () => {
                 {scale}%
               </button>
             ))}
+          </div>
+
+          {/* Active Session Play Time Indicator */}
+          <div 
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-white/5 border border-white/10 text-slate-300 font-mono select-none"
+            title={`Session Play Time: ${formattedSessionTime} • Total Profile Play Time: ${formattedTotalPlayTime}`}
+          >
+            <Clock className="w-3.5 h-3.5 text-[var(--accent)] animate-pulse" />
+            <span>{formattedSessionTime}</span>
           </div>
 
           {user && (

@@ -234,6 +234,7 @@ interface AchievementsContextType {
   unlockAchievement: (id: string, silent?: boolean) => void;
   unlockAllAchievements: () => void;
   wipeAllProgress: () => Promise<void>;
+  clearAchievements: () => void;
   incrementProgress: (id: string, amount?: number) => void;
   isUnlocked: (id: string) => boolean;
   getProgress: (id: string) => number;
@@ -377,13 +378,51 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const spentXpRef = useRef(spentXp);
   useEffect(() => { spentXpRef.current = spentXp; }, [spentXp]);
 
-  // Sync with Firestore if logged in; merge without wiping local data
+  const isSigningOutRef = useRef<boolean>(false);
+
+  const clearSessionAchievements = useCallback(() => {
+    isSigningOutRef.current = true;
+    setUnlocked({});
+    setProgressData({});
+    setGamePoints(0);
+    setGamesPlayed(0);
+    setBonusXp(0);
+    setSpentXp(0);
+    unlockedRef.current = {};
+    progressDataRef.current = {};
+    gamePointsRef.current = 0;
+    gamesPlayedRef.current = 0;
+    bonusXpRef.current = 0;
+    spentXpRef.current = 0;
+
+    try {
+      localStorage.removeItem('nexus_achievements');
+      localStorage.removeItem('nexus_achievements_progress');
+      localStorage.removeItem('nexus_game_points');
+      localStorage.removeItem('nexus_games_played');
+      localStorage.removeItem('nexus_bonus_xp');
+      localStorage.removeItem('nexus_spent_xp');
+    } catch (e) {}
+  }, []);
+
+  // Listen for explicit sign-out event from AuthContext or anywhere in the app
+  useEffect(() => {
+    const handleClear = () => {
+      clearSessionAchievements();
+    };
+    window.addEventListener('nexus_achievements_cleared', handleClear);
+    return () => window.removeEventListener('nexus_achievements_cleared', handleClear);
+  }, [clearSessionAchievements]);
+
+  // Sync with Firestore if logged in; clear achievements when signed out
   useEffect(() => {
     if (!user) {
+      clearSessionAchievements();
       setIsRemoteLoaded(true);
       return;
     }
 
+    isSigningOutRef.current = false;
     setIsRemoteLoaded(false);
 
     try {
@@ -454,7 +493,7 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
       console.error(e);
       setIsRemoteLoaded(true);
     }
-  }, [user]);
+  }, [user, clearSessionAchievements]);
 
   const activeName = profile?.nickname || profile?.displayName || localStorage.getItem('username') || '';
   const isPoisonZombie = activeName.toLowerCase().trim() === 'poison zombie' || activeName.toLowerCase().trim() === 'poision zombie';
@@ -476,6 +515,7 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   // Immediate save helper to sync state to Firestore and localStorage
   const flushSave = useCallback(async () => {
+    if (isSigningOutRef.current) return;
     const curUser = userRef.current;
     const curProfile = profileRef.current;
     const curGamePoints = gamePointsRef.current;
@@ -601,6 +641,8 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   // Sync to localStorage on every change and debounce Firestore save (800ms)
   useEffect(() => {
+    if (isSigningOutRef.current || !user) return;
+
     try {
       localStorage.setItem('nexus_achievements', JSON.stringify(unlocked));
       localStorage.setItem('nexus_achievements_progress', JSON.stringify(progressData));
@@ -612,7 +654,7 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
       console.error(e);
     }
 
-    if (!user || !isRemoteLoaded) return;
+    if (!isRemoteLoaded) return;
 
     const saveTimer = setTimeout(() => {
       flushSave();
@@ -887,6 +929,7 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
       unlockAchievement,
       unlockAllAchievements,
       wipeAllProgress,
+      clearAchievements: clearSessionAchievements,
       incrementProgress,
       isUnlocked,
       getProgress,
