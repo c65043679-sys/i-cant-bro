@@ -3,7 +3,7 @@ import confetti from 'canvas-confetti';
 import { useAuth } from './AuthContext';
 import { useSettings } from './SettingsContext';
 import { soundManager } from '../utils/soundEffects';
-import { doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { containsProfanity } from '../utils/profanityFilter';
 import { Trophy, Star, Sparkles, Zap, Crown, ShieldAlert, Palette, Eye, Radio, Flame, Lock, Unlock, CheckCircle2, Rocket } from 'lucide-react';
@@ -379,121 +379,7 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
   useEffect(() => { spentXpRef.current = spentXp; }, [spentXp]);
 
   const isSigningOutRef = useRef<boolean>(false);
-
-  const clearSessionAchievements = useCallback(() => {
-    isSigningOutRef.current = true;
-    setUnlocked({});
-    setProgressData({});
-    setGamePoints(0);
-    setGamesPlayed(0);
-    setBonusXp(0);
-    setSpentXp(0);
-    unlockedRef.current = {};
-    progressDataRef.current = {};
-    gamePointsRef.current = 0;
-    gamesPlayedRef.current = 0;
-    bonusXpRef.current = 0;
-    spentXpRef.current = 0;
-
-    try {
-      localStorage.removeItem('nexus_achievements');
-      localStorage.removeItem('nexus_achievements_progress');
-      localStorage.removeItem('nexus_game_points');
-      localStorage.removeItem('nexus_games_played');
-      localStorage.removeItem('nexus_bonus_xp');
-      localStorage.removeItem('nexus_spent_xp');
-    } catch (e) {}
-  }, []);
-
-  // Listen for explicit sign-out event from AuthContext or anywhere in the app
-  useEffect(() => {
-    const handleClear = () => {
-      clearSessionAchievements();
-    };
-    window.addEventListener('nexus_achievements_cleared', handleClear);
-    return () => window.removeEventListener('nexus_achievements_cleared', handleClear);
-  }, [clearSessionAchievements]);
-
-  // Sync with Firestore if logged in; clear achievements when signed out
-  useEffect(() => {
-    if (!user) {
-      clearSessionAchievements();
-      setIsRemoteLoaded(true);
-      return;
-    }
-
-    isSigningOutRef.current = false;
-    setIsRemoteLoaded(false);
-
-    try {
-      const unsub = onSnapshot(doc(db, 'users', user.uid, 'data', 'achievements'), (snap) => {
-        if (snap.exists()) {
-          const remoteData = snap.data();
-          const remoteUnlocked = remoteData.unlocked || {};
-          const remoteProgress = remoteData.progress || {};
-
-          // Merge local and remote unlocked achievements so nothing gets wiped
-          const mergedUnlocked = { ...remoteUnlocked, ...unlockedRef.current };
-          const mergedProgress = { ...remoteProgress, ...progressDataRef.current };
-          const activeUname = (profile?.nickname || profile?.displayName || localStorage.getItem('username') || '').toLowerCase().trim();
-          const isPZ = activeUname === 'poison zombie' || activeUname === 'poision zombie';
-          const isManhack = activeUname === 'manhack';
-          let maxGamePoints = isManhack ? 0 : Math.max(
-            typeof remoteData.gamePoints === 'number' ? remoteData.gamePoints : 0, 
-            parseInt(localStorage.getItem('nexus_game_points') || '0', 10),
-            gamePoints
-          );
-          if (isPZ) maxGamePoints = Math.max(maxGamePoints, 1000);
-          const maxGamesPlayed = isManhack ? 0 : Math.max(
-            typeof remoteData.gamesPlayed === 'number' ? remoteData.gamesPlayed : 0, 
-            parseInt(localStorage.getItem('nexus_games_played') || '0', 10),
-            gamesPlayed
-          );
-          const maxBonusXp = isManhack ? 0 : Math.max(
-            typeof remoteData.bonusXp === 'number' ? remoteData.bonusXp : 0,
-            parseInt(localStorage.getItem('nexus_bonus_xp') || '0', 10),
-            bonusXp
-          );
-          const remoteSpentXp = isManhack ? 0 : (typeof remoteData.spentXp === 'number' 
-            ? remoteData.spentXp 
-            : parseInt(localStorage.getItem('nexus_spent_xp') || '0', 10));
-
-          const finalUnlocked = isManhack ? {} : mergedUnlocked;
-          const finalProgress = isManhack ? {} : mergedProgress;
-
-          unlockedRef.current = finalUnlocked;
-          progressDataRef.current = finalProgress;
-          setUnlocked(finalUnlocked);
-          setProgressData(finalProgress);
-          setGamePoints(maxGamePoints);
-          setGamesPlayed(maxGamesPlayed);
-          setBonusXp(maxBonusXp);
-          setSpentXp(remoteSpentXp);
-
-          try {
-            localStorage.setItem('nexus_achievements', JSON.stringify(finalUnlocked));
-            localStorage.setItem('nexus_achievements_progress', JSON.stringify(finalProgress));
-            localStorage.setItem('nexus_game_points', maxGamePoints.toString());
-            localStorage.setItem('nexus_games_played', maxGamesPlayed.toString());
-            localStorage.setItem('nexus_bonus_xp', maxBonusXp.toString());
-            localStorage.setItem('nexus_spent_xp', remoteSpentXp.toString());
-          } catch (e) {}
-        }
-        setIsRemoteLoaded(true);
-      }, (err) => {
-        console.warn('Achievements sync offline', err);
-        setIsRemoteLoaded(true);
-      });
-
-      return () => {
-        unsub();
-        setIsRemoteLoaded(true);
-      };
-    } catch (e) {
-      console.error(e);
-      setIsRemoteLoaded(true);
-    }
-  }, [user, clearSessionAchievements]);
+  const isExplicitWipingRef = useRef<boolean>(false);
 
   const activeName = profile?.nickname || profile?.displayName || localStorage.getItem('username') || '';
   const isPoisonZombie = activeName.toLowerCase().trim() === 'poison zombie' || activeName.toLowerCase().trim() === 'poision zombie';
@@ -522,6 +408,11 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const curGamesPlayed = gamesPlayedRef.current;
     const curBonusXp = bonusXpRef.current;
     const curSpentXp = spentXpRef.current;
+
+    // Safety guard: Never overwrite cloud achievements with empty data unless explicit wipe is active
+    if (curUser && curUser.uid && Object.keys(unlockedRef.current).length === 0 && !isExplicitWipingRef.current) {
+      return;
+    }
 
     try {
       localStorage.setItem('nexus_achievements', JSON.stringify(unlockedRef.current));
@@ -583,6 +474,7 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
           gamePoints: effectiveGp,
           gamesPlayed: effectiveGamesPlayedCount,
           achievementsCount: isManhackUser ? 0 : (isPZ ? 0 : Object.keys(unlockedRef.current).length),
+          unlockedAchievements: isManhackUser ? {} : unlockedRef.current,
           levelTitle: currentLevelTitle,
           updatedAt: new Date().toISOString()
         };
@@ -620,6 +512,165 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   }, []);
 
+  const clearSessionAchievements = useCallback(async () => {
+    // If currently signed in, do a final flush to Firestore so cloud account is 100% saved
+    if (userRef.current && userRef.current.uid && Object.keys(unlockedRef.current).length > 0) {
+      try {
+        await flushSave();
+      } catch (e) {
+        console.warn('Error saving before signout:', e);
+      }
+    }
+
+    isSigningOutRef.current = true;
+    setUnlocked({});
+    setProgressData({});
+    setGamePoints(0);
+    setGamesPlayed(0);
+    setBonusXp(0);
+    setSpentXp(0);
+    unlockedRef.current = {};
+    progressDataRef.current = {};
+    gamePointsRef.current = 0;
+    gamesPlayedRef.current = 0;
+    bonusXpRef.current = 0;
+    spentXpRef.current = 0;
+
+    try {
+      localStorage.removeItem('nexus_achievements');
+      localStorage.removeItem('nexus_achievements_progress');
+      localStorage.removeItem('nexus_game_points');
+      localStorage.removeItem('nexus_games_played');
+      localStorage.removeItem('nexus_bonus_xp');
+      localStorage.removeItem('nexus_spent_xp');
+    } catch (e) {}
+
+    setTimeout(() => {
+      isSigningOutRef.current = false;
+    }, 500);
+  }, [flushSave]);
+
+  // Listen for explicit sign-out event from AuthContext or anywhere in the app
+  useEffect(() => {
+    const handleClear = () => {
+      clearSessionAchievements();
+    };
+    window.addEventListener('nexus_achievements_cleared', handleClear);
+    return () => window.removeEventListener('nexus_achievements_cleared', handleClear);
+  }, [clearSessionAchievements]);
+
+  // Listen for before sign-out to flush data to Firestore
+  useEffect(() => {
+    const handleBeforeSignout = () => {
+      if (userRef.current && userRef.current.uid && Object.keys(unlockedRef.current).length > 0) {
+        flushSave();
+      }
+    };
+    window.addEventListener('nexus_before_signout', handleBeforeSignout);
+    return () => window.removeEventListener('nexus_before_signout', handleBeforeSignout);
+  }, [flushSave]);
+
+  // Sync with Firestore if logged in; NEVER clear achievements on tab refresh or for guests!
+  useEffect(() => {
+    if (!user) {
+      // User is either a guest or waiting for auth to resolve: keep achievements in localStorage/state intact!
+      setIsRemoteLoaded(true);
+      return;
+    }
+
+    isSigningOutRef.current = false;
+    setIsRemoteLoaded(false);
+
+    try {
+      const unsub = onSnapshot(doc(db, 'users', user.uid, 'data', 'achievements'), async (snap) => {
+        if (snap.exists()) {
+          const remoteData = snap.data();
+          let remoteUnlocked = remoteData.unlocked || {};
+          let remoteProgress = remoteData.progress || {};
+
+          // Fallback: Check parent user doc if remoteUnlocked is empty
+          if (Object.keys(remoteUnlocked).length === 0) {
+            try {
+              const userSnap = await getDoc(doc(db, 'users', user.uid));
+              if (userSnap.exists() && userSnap.data()?.unlockedAchievements) {
+                remoteUnlocked = userSnap.data().unlockedAchievements || {};
+              }
+            } catch (e) {}
+          }
+
+          // Merge local and remote unlocked achievements so nothing gets wiped
+          const mergedUnlocked = { ...remoteUnlocked, ...unlockedRef.current };
+          const mergedProgress = { ...remoteProgress, ...progressDataRef.current };
+          const activeUname = (profile?.nickname || profile?.displayName || localStorage.getItem('username') || '').toLowerCase().trim();
+          const isPZ = activeUname === 'poison zombie' || activeUname === 'poision zombie';
+          const isManhackUser = activeUname === 'manhack';
+          let maxGamePoints = isManhackUser ? 0 : Math.max(
+            typeof remoteData.gamePoints === 'number' ? remoteData.gamePoints : 0, 
+            parseInt(localStorage.getItem('nexus_game_points') || '0', 10),
+            gamePointsRef.current
+          );
+          if (isPZ) maxGamePoints = Math.max(maxGamePoints, 1000);
+          const maxGamesPlayed = isManhackUser ? 0 : Math.max(
+            typeof remoteData.gamesPlayed === 'number' ? remoteData.gamesPlayed : 0, 
+            parseInt(localStorage.getItem('nexus_games_played') || '0', 10),
+            gamesPlayedRef.current
+          );
+          const maxBonusXp = isManhackUser ? 0 : Math.max(
+            typeof remoteData.bonusXp === 'number' ? remoteData.bonusXp : 0,
+            parseInt(localStorage.getItem('nexus_bonus_xp') || '0', 10),
+            bonusXpRef.current
+          );
+          const remoteSpentXp = isManhackUser ? 0 : (typeof remoteData.spentXp === 'number' 
+            ? remoteData.spentXp 
+            : parseInt(localStorage.getItem('nexus_spent_xp') || '0', 10));
+
+          const finalUnlocked = isManhackUser ? {} : mergedUnlocked;
+          const finalProgress = isManhackUser ? {} : mergedProgress;
+
+          unlockedRef.current = finalUnlocked;
+          progressDataRef.current = finalProgress;
+          setUnlocked(finalUnlocked);
+          setProgressData(finalProgress);
+          setGamePoints(maxGamePoints);
+          setGamesPlayed(maxGamesPlayed);
+          setBonusXp(maxBonusXp);
+          setSpentXp(remoteSpentXp);
+
+          try {
+            localStorage.setItem('nexus_achievements', JSON.stringify(finalUnlocked));
+            localStorage.setItem('nexus_achievements_progress', JSON.stringify(finalProgress));
+            localStorage.setItem('nexus_game_points', maxGamePoints.toString());
+            localStorage.setItem('nexus_games_played', maxGamesPlayed.toString());
+            localStorage.setItem('nexus_bonus_xp', maxBonusXp.toString());
+            localStorage.setItem('nexus_spent_xp', remoteSpentXp.toString());
+          } catch (e) {}
+
+          // If local state had more achievements than remote doc, write the merged set back
+          if (Object.keys(finalUnlocked).length > Object.keys(remoteUnlocked).length) {
+            flushSave();
+          }
+        } else {
+          // Document does not exist yet in Firestore
+          // If we have local achievements, write them to Firestore!
+          if (Object.keys(unlockedRef.current).length > 0) {
+            flushSave();
+          }
+        }
+        setIsRemoteLoaded(true);
+      }, (err) => {
+        console.warn('Achievements sync offline', err);
+        setIsRemoteLoaded(true);
+      });
+
+      return () => {
+        unsub();
+      };
+    } catch (e) {
+      console.error(e);
+      setIsRemoteLoaded(true);
+    }
+  }, [user, flushSave, profile?.nickname, profile?.displayName]);
+
   // Automatic reset if active account is Manhack
   useEffect(() => {
     if (isManhack) {
@@ -641,7 +692,7 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   // Sync to localStorage on every change and debounce Firestore save (800ms)
   useEffect(() => {
-    if (isSigningOutRef.current || !user) return;
+    if (isSigningOutRef.current) return;
 
     try {
       localStorage.setItem('nexus_achievements', JSON.stringify(unlocked));
@@ -654,7 +705,7 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
       console.error(e);
     }
 
-    if (!isRemoteLoaded) return;
+    if (!user || !isRemoteLoaded) return;
 
     const saveTimer = setTimeout(() => {
       flushSave();
@@ -770,6 +821,7 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
   }, [settings.uiSoundEffects, flushSave]);
 
   const wipeAllProgress = useCallback(async () => {
+    isExplicitWipingRef.current = true;
     setUnlocked({});
     setProgressData({});
     setGamePoints(0);
@@ -815,6 +867,7 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
           gamePoints: 0,
           gamesPlayed: 0,
           achievementsCount: 0,
+          unlockedAchievements: {},
           levelTitle: LEVEL_TITLES[0],
           updatedAt: new Date().toISOString()
         }, { merge: true });
@@ -822,6 +875,10 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
         console.warn('Error wiping remote achievements:', fErr);
       }
     }
+
+    setTimeout(() => {
+      isExplicitWipingRef.current = false;
+    }, 1000);
   }, [user]);
 
   const incrementProgress = useCallback((id: string, amount: number = 1) => {

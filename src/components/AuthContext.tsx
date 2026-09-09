@@ -300,7 +300,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
     setIsAdmin(false);
     sessionStorage.removeItem('isAdmin');
     localStorage.removeItem('isAdmin');
@@ -309,6 +309,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsOwnerUnlocked(false);
 
     try {
+      // First signal listeners to flush their state to Firestore
+      window.dispatchEvent(new Event('nexus_before_signout'));
+      await new Promise(r => setTimeout(r, 80));
+
       localStorage.removeItem('username');
       localStorage.removeItem('userpic');
       localStorage.removeItem('nexus_achievements');
