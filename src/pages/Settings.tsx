@@ -25,8 +25,7 @@ import {
   Eye,
   Trash2,
   AlertTriangle,
-  Crown,
-  ShieldCheck
+  Crown
 } from 'lucide-react';
 
 const ACCENT_HUES = [
@@ -42,7 +41,7 @@ const ACCENT_HUES = [
 ];
 
 export const Settings: React.FC = () => {
-  const { user, profile, updateProfile, isOwner, isAdmin, setAdminStatus, setOwnerStatus } = useAuth();
+  const { user, profile, updateProfile, isOwner } = useAuth();
   const { settings, updateSetting, updateSettings, resetSettings, triggerPanic: rawTriggerPanic } = useSettings();
   const { unlockAchievement, wipeAllProgress } = useAchievements();
 
@@ -53,6 +52,14 @@ export const Settings: React.FC = () => {
   const [message, setMessage] = useState('');
   const [showWipeModal, setShowWipeModal] = useState(false);
   const [isWipingProgress, setIsWipingProgress] = useState(false);
+  const [nicknameInput, setNicknameInput] = useState(profile?.nickname || user?.displayName || '');
+  const [isSavingName, setIsSavingName] = useState(false);
+
+  useEffect(() => {
+    if (profile?.nickname || user?.displayName) {
+      setNicknameInput(profile?.nickname || user?.displayName || '');
+    }
+  }, [profile?.nickname, user?.displayName]);
 
   const handleWipeAllProgress = async () => {
     setIsWipingProgress(true);
@@ -113,117 +120,6 @@ export const Settings: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Main Settings Panel */}
         <div className="lg:col-span-2 space-y-8">
-          
-          {/* Developer Role Simulation Console */}
-          <section className="bg-gradient-to-r from-amber-500/10 via-purple-500/5 to-amber-500/10 border border-amber-500/30 rounded-3xl p-6 sm:p-8 space-y-6 backdrop-blur-xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-48 h-48 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
-            
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
-                  <Crown className="w-5 h-5" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-white">Dev Testing & Role Override</h2>
-                  <p className="text-xs text-slate-400">Instantly toggle Owner/Admin roles to test administrative features</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <div className="flex items-center justify-between p-4 rounded-2xl bg-black/40 border border-white/5">
-                <div className="space-y-0.5">
-                  <p className="text-sm font-bold text-white flex items-center gap-2">
-                    <Crown className="w-4 h-4 text-amber-400" />
-                    Simulate Owner Mode
-                  </p>
-                  <p className="text-[11px] text-slate-400 leading-normal">
-                    Grants access to the **Owner Vault 👑** and full platform privileges.
-                  </p>
-                </div>
-                <button
-                  onClick={() => {
-                    const next = !isOwner;
-                    setOwnerStatus(next);
-                    setMessage(`Owner Mode successfully simulated: ${next ? 'ENABLED' : 'DISABLED'}`);
-                    setTimeout(() => setMessage(''), 3000);
-                  }}
-                  className={`w-12 h-6 rounded-full relative transition-colors cursor-pointer shrink-0 ${
-                    isOwner ? 'bg-amber-500' : 'bg-slate-800'
-                  }`}
-                >
-                  <div className={`w-4 h-4 rounded-full bg-white transition-all absolute top-1 ${
-                    isOwner ? 'right-1' : 'left-1'
-                  }`} />
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between p-4 rounded-2xl bg-black/40 border border-white/5">
-                <div className="space-y-0.5">
-                  <p className="text-sm font-bold text-white flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-purple-400" />
-                    Simulate Admin Mode
-                  </p>
-                  <p className="text-[11px] text-slate-400 leading-normal">
-                    Grants moderator/admin access levels across the platform.
-                  </p>
-                </div>
-                <button
-                  onClick={() => {
-                    const next = !isAdmin;
-                    setAdminStatus(next);
-                    setMessage(`Admin Mode successfully simulated: ${next ? 'ENABLED' : 'DISABLED'}`);
-                    setTimeout(() => setMessage(''), 3000);
-                  }}
-                  className={`w-12 h-6 rounded-full relative transition-colors cursor-pointer shrink-0 ${
-                    isAdmin ? 'bg-purple-500' : 'bg-slate-800'
-                  }`}
-                >
-                  <div className={`w-4 h-4 rounded-full bg-white transition-all absolute top-1 ${
-                    isAdmin ? 'right-1' : 'left-1'
-                  }`} />
-                </button>
-              </div>
-            </div>
-
-            <div className="bg-black/20 p-4 rounded-2xl border border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">
-              <div className="text-slate-400 text-center sm:text-left leading-relaxed">
-                <span>Current Status: </span>
-                <span className={`font-mono font-bold ${isOwner ? 'text-amber-400' : 'text-slate-500'}`}>
-                  {isOwner ? '👑 OWNER ACTIVE' : '👤 USER'}
-                </span>
-                <span className="text-slate-600 font-bold"> | </span>
-                <span className={`font-mono font-bold ${isAdmin ? 'text-purple-400' : 'text-slate-500'}`}>
-                  {isAdmin ? '🛡️ ADMIN ACTIVE' : '👤 USER'}
-                </span>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    setOwnerStatus(false);
-                    setAdminStatus(false);
-                    setMessage('All simulated roles cleared. You are now a standard guest/user.');
-                    setTimeout(() => setMessage(''), 3000);
-                  }}
-                  className="px-3 py-1.5 bg-white/5 border border-white/10 hover:bg-white/10 text-slate-300 rounded-xl text-[11px] font-bold transition-all cursor-pointer"
-                >
-                  Clear Simulated Roles
-                </button>
-                <button
-                  onClick={() => {
-                    setOwnerStatus(true);
-                    setAdminStatus(true);
-                    setMessage('Simulated roles activated. Full Owner/Admin privileges granted!');
-                    setTimeout(() => setMessage(''), 3000);
-                  }}
-                  className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-black font-black rounded-xl text-[11px] transition-all cursor-pointer"
-                >
-                  Activate All Roles
-                </button>
-              </div>
-            </div>
-          </section>
-
           {/* SECTION 1: Cloaking & Emergency Panic Mode */}
           <section className="bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 space-y-6 backdrop-blur-xl">
             <div className="flex items-center justify-between border-b border-white/10 pb-4">
@@ -585,28 +481,51 @@ export const Settings: React.FC = () => {
             {user ? (
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-400 mb-2">Assigned Combat Handle</label>
-                  <div className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm font-bold text-amber-400 font-mono flex items-center justify-between shadow-inner">
-                    <span>{isOwner || user.email?.toLowerCase() === 'alexsarsero@gmail.com' ? 'Gordon Freeman' : getHlAccountName(user.uid, false, user.email, profile?.nickname)}</span>
-                    <span className="text-[10px] text-slate-400 font-sans font-normal">
-                      {isOwner || user.email?.toLowerCase() === 'alexsarsero@gmail.com' ? '👑 Owner' : 'Half-Life Combatant'}
-                    </span>
+                  <label className="block text-xs font-bold text-slate-400 mb-2">Display Name / Handle</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={nicknameInput}
+                      onChange={(e) => setNicknameInput(e.target.value)}
+                      placeholder="Your custom username"
+                      maxLength={24}
+                      className="flex-1 bg-black/40 border border-white/10 rounded-xl px-3.5 py-2 text-sm text-white font-bold font-mono focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                    />
+                    <button
+                      onClick={async () => {
+                        if (!nicknameInput.trim()) return;
+                        setIsSavingName(true);
+                        try {
+                          await updateProfile({ nickname: nicknameInput.trim(), displayName: nicknameInput.trim() });
+                          localStorage.setItem('username', nicknameInput.trim());
+                          setMessage('Display handle updated successfully!');
+                          setTimeout(() => setMessage(''), 3000);
+                        } catch (err) {
+                          console.error(err);
+                        } finally {
+                          setIsSavingName(false);
+                        }
+                      }}
+                      disabled={isSavingName || !nicknameInput.trim()}
+                      className="px-3.5 py-2 bg-[var(--accent)] hover:brightness-110 text-black font-black text-xs rounded-xl transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      Save
+                    </button>
                   </div>
                   <p className="text-[11px] text-slate-400 mt-1.5">
-                    {isOwner || user.email?.toLowerCase() === 'alexsarsero@gmail.com'
-                      ? 'Owner account designated as Gordon Freeman (alexsarsero@gmail.com).'
-                      : 'Accounts are deterministically assigned Half-Life 1 and 2 enemy handles.'}
+                    This name is displayed on your achievements and the Hall of Champions leaderboard.
                   </p>
                 </div>
 
                 <div className="p-4 rounded-2xl bg-black/40 border border-white/5 text-xs space-y-2">
                   <div className="flex justify-between text-slate-400">
-                    <span>Account ID</span>
-                    <span className="font-mono text-white text-[10px] truncate max-w-[120px]">{user.uid}</span>
+                    <span>Account Email</span>
+                    <span className="font-mono text-white text-[11px] truncate max-w-[160px]">{user.email || 'None'}</span>
                   </div>
                   <div className="flex justify-between text-slate-400">
-                    <span>Status</span>
-                    <span className="text-emerald-400 font-bold">Active Member</span>
+                    <span>Account Status</span>
+                    <span className="text-emerald-400 font-bold">Real Player Account</span>
                   </div>
                 </div>
               </div>

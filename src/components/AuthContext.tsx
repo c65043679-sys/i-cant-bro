@@ -116,8 +116,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (user) {
         setUser(user);
         const isUserOwner = (user.email?.toLowerCase() === 'alexsarsero@gmail.com') || (sessionStorage.getItem('isOwner') === 'true');
-        const autoGamerTag = generateGamerTag(user.uid, isUserOwner, user.email);
-        localStorage.setItem('username', autoGamerTag);
+        const realAccountName = isUserOwner
+          ? 'Gordon Freeman'
+          : (user.displayName || (user.email ? user.email.split('@')[0] : 'Player'));
+        
+        const existingLocalName = localStorage.getItem('username');
+        const defaultName = (existingLocalName && existingLocalName !== 'Nexus Explorer' && existingLocalName !== 'Nexus Member')
+          ? existingLocalName
+          : realAccountName;
+        localStorage.setItem('username', defaultName);
 
         let localFavs: string[] = [];
         let localUnlocked: string[] = ['initiate_core'];
@@ -142,8 +149,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Immediately set initial profile in state so user account loads without blocking
         setProfile({
           uid: user.uid,
-          displayName: autoGamerTag,
-          nickname: autoGamerTag,
+          displayName: defaultName,
+          nickname: defaultName,
           email: user.email,
           photoURL: user.photoURL,
           equippedAvatar: localEquipped,
@@ -158,8 +165,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (!userDoc.exists()) {
             const newProfile = {
               uid: user.uid,
-              displayName: autoGamerTag,
-              nickname: autoGamerTag,
+              displayName: defaultName,
+              nickname: defaultName,
               email: user.email,
               photoURL: user.photoURL,
               equippedAvatar: localEquipped,
@@ -172,9 +179,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           } else {
             const data = userDoc.data();
             const updates: any = {};
-            if (data?.nickname !== autoGamerTag || data?.displayName !== autoGamerTag) {
-              updates.nickname = autoGamerTag;
-              updates.displayName = autoGamerTag;
+            const existingName = data?.nickname || data?.displayName;
+            if (!existingName) {
+              updates.nickname = defaultName;
+              updates.displayName = defaultName;
+            } else {
+              localStorage.setItem('username', existingName);
             }
             // Ensure mandatory starter / Sovereign avatars are present
             const docUnlocked: string[] = data?.unlockedAvatars || ['initiate_core'];
@@ -364,9 +374,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateProfile = async (data: Partial<UserProfile>) => {
     const isUserOwner = (user?.email?.toLowerCase() === 'alexsarsero@gmail.com') || isOwnerUnlocked;
-    const chosenName = user?.uid 
-      ? generateGamerTag(user.uid, isUserOwner, user.email) 
-      : generateGamerTag(localStorage.getItem('username'), isUserOwner);
+    const requestedName = data.nickname?.trim() || data.displayName?.trim();
+    const fallbackName = user?.displayName || (user?.email ? user.email.split('@')[0] : 'Player');
+    const chosenName = isUserOwner 
+      ? 'Gordon Freeman'
+      : (requestedName || localStorage.getItem('username') || fallbackName);
     localStorage.setItem('username', chosenName);
 
     // Update local React state optimistically so UI updates immediately across all screens

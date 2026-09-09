@@ -210,191 +210,29 @@ async function startServer() {
     res.json({ success: true, ...updated });
   });
 
-  const DEFAULT_COMMUNITY_PLAYERS = [
-    {
-      uid: "hl_combatant_poison_zombie",
-      displayName: "Poison Zombie",
-      email: null,
-      photoURL: null,
-      equippedAvatar: "decay_hulk",
-      totalScore: 5000,
-      gamePoints: 1000,
-      achievementXp: 4000,
-      gamesPlayed: 0,
-      achievementsCount: 0,
-      title: "Recruit",
-      avatarBg: "bg-gradient-to-br from-emerald-600 to-lime-600",
-      isOwner: false,
-      updatedAt: new Date().toISOString()
-    },
-    {
-      uid: "hl_combatant_vortigaunt",
-      displayName: "Vortigaunt",
-      email: null,
-      photoURL: null,
-      equippedAvatar: "vort_essence",
-      totalScore: 4350,
-      gamePoints: 1200,
-      achievementXp: 3150,
-      gamesPlayed: 18,
-      achievementsCount: 21,
-      title: "Combine Slayer",
-      avatarBg: "bg-gradient-to-br from-cyan-600 to-emerald-600",
-      isOwner: false,
-      updatedAt: new Date().toISOString()
-    },
-    {
-      uid: "hl_combatant_combine_elite",
-      displayName: "Combine Elite",
-      email: null,
-      photoURL: null,
-      equippedAvatar: "elite_synth",
-      totalScore: 3820,
-      gamePoints: 1120,
-      achievementXp: 2700,
-      gamesPlayed: 15,
-      achievementsCount: 18,
-      title: "Resistance Champion",
-      avatarBg: "bg-gradient-to-br from-red-600 to-rose-700",
-      isOwner: false,
-      updatedAt: new Date().toISOString()
-    },
-    {
-      uid: "hl_combatant_metrocop",
-      displayName: "Civil Protection Metrocop",
-      email: null,
-      photoURL: null,
-      equippedAvatar: "metrocop_visor",
-      totalScore: 2950,
-      gamePoints: 850,
-      achievementXp: 2100,
-      gamesPlayed: 12,
-      achievementsCount: 14,
-      title: "Veteran Operative",
-      avatarBg: "bg-gradient-to-br from-blue-600 to-indigo-700",
-      isOwner: false,
-      updatedAt: new Date().toISOString()
-    },
-    {
-      uid: "hl_combatant_antlion_guard",
-      displayName: "Antlion Guard",
-      email: null,
-      photoURL: null,
-      equippedAvatar: "antlion_chitin",
-      totalScore: 2400,
-      gamePoints: 750,
-      achievementXp: 1650,
-      gamesPlayed: 9,
-      achievementsCount: 11,
-      title: "Black Mesa Survivor",
-      avatarBg: "bg-gradient-to-br from-amber-600 to-yellow-600",
-      isOwner: false,
-      updatedAt: new Date().toISOString()
-    },
-    {
-      uid: "hl_combatant_fast_zombie",
-      displayName: "Fast Zombie",
-      email: null,
-      photoURL: null,
-      equippedAvatar: "fast_zombie",
-      totalScore: 1850,
-      gamePoints: 500,
-      achievementXp: 1350,
-      gamesPlayed: 8,
-      achievementsCount: 9,
-      title: "Lambda Specialist",
-      avatarBg: "bg-gradient-to-br from-orange-600 to-red-600",
-      isOwner: false,
-      updatedAt: new Date().toISOString()
-    },
-    {
-      uid: "hl_combatant_hunter",
-      displayName: "Hunter",
-      email: null,
-      photoURL: null,
-      equippedAvatar: "synth_stalker",
-      totalScore: 1200,
-      gamePoints: 300,
-      achievementXp: 900,
-      gamesPlayed: 5,
-      achievementsCount: 6,
-      title: "Sector Vanguard",
-      avatarBg: "bg-gradient-to-br from-sky-600 to-blue-700",
-      isOwner: false,
-      updatedAt: new Date().toISOString()
-    },
-    {
-      uid: "hl_combatant_combine_soldier",
-      displayName: "Combine Soldier",
-      email: null,
-      photoURL: null,
-      equippedAvatar: "soldier_helm",
-      totalScore: 650,
-      gamePoints: 200,
-      achievementXp: 450,
-      gamesPlayed: 3,
-      achievementsCount: 3,
-      title: "City 17 Rebel",
-      avatarBg: "bg-gradient-to-br from-slate-600 to-slate-800",
-      isOwner: false,
-      updatedAt: new Date().toISOString()
-    },
-    {
-      uid: "hl_combatant_headcrab_zombie",
-      displayName: "Headcrab Zombie",
-      email: null,
-      photoURL: null,
-      equippedAvatar: "initiate_core",
-      totalScore: 300,
-      gamePoints: 150,
-      achievementXp: 150,
-      gamesPlayed: 2,
-      achievementsCount: 1,
-      title: "Sector Scout",
-      avatarBg: "bg-gradient-to-br from-purple-600 to-violet-700",
-      isOwner: false,
-      updatedAt: new Date().toISOString()
-    },
-    {
-      uid: "hl_combatant_manhack",
-      displayName: "Manhack",
-      email: null,
-      photoURL: null,
-      equippedAvatar: "manhack_blade",
-      totalScore: 0,
-      gamePoints: 0,
-      achievementXp: 0,
-      gamesPlayed: 0,
-      achievementsCount: 0,
-      title: "Recruit",
-      avatarBg: "bg-gradient-to-br from-zinc-600 to-zinc-800",
-      isOwner: false,
-      updatedAt: new Date().toISOString()
-    }
-  ];
+  // Helper to check if player is an owner account (Gordon Freeman / alexsarsero@gmail.com)
+  function isOwnerRecord(p: any): boolean {
+    if (!p) return false;
+    const email = (p.email || "").toLowerCase().trim();
+    return (
+      email === "alexsarsero@gmail.com" ||
+      p.displayName === "Gordon Freeman"
+    );
+  }
 
   function readLeaderboardData(): any[] {
     try {
       if (fs.existsSync(LEADERBOARD_FILE)) {
         const raw = fs.readFileSync(LEADERBOARD_FILE, "utf-8");
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          // Ensure all default community combatants are present if not already added
-          const playerMap = new Map<string, any>();
-          DEFAULT_COMMUNITY_PLAYERS.forEach(dp => playerMap.set(dp.displayName.toLowerCase().trim(), dp));
-          parsed.forEach((p: any) => {
-            const key = (p.displayName || p.uid || "").toLowerCase().trim();
-            playerMap.set(key, p);
-          });
-          return Array.from(playerMap.values());
+        if (Array.isArray(parsed)) {
+          return parsed.filter(p => !isOwnerRecord(p) && !p.uid?.startsWith("hl_combatant_"));
         }
       }
     } catch (e) {
       console.warn("Could not read leaderboard file:", e);
     }
-    // Return default combatant operatives if file is missing or empty
-    writeLeaderboardData(DEFAULT_COMMUNITY_PLAYERS);
-    return DEFAULT_COMMUNITY_PLAYERS;
+    return [];
   }
 
   function writeLeaderboardData(data: any[]) {
@@ -409,48 +247,23 @@ async function startServer() {
     }
   }
 
-  // Helper to check if player is an owner account (Gordon Freeman)
-  function isOwnerRecord(p: any): boolean {
-    if (!p) return false;
-    const email = (p.email || "").toLowerCase().trim();
-    return (
-      email === "alexsarsero@gmail.com" ||
-      p.displayName === "Gordon Freeman"
-    );
-  }
-
   // GET /api/leaderboard - Returns real registered website users only (owner permanently excluded)
   app.get("/api/leaderboard", (req, res) => {
     const rawPlayers = readLeaderboardData();
-    const players = rawPlayers
-      .filter((p: any) => !isOwnerRecord(p))
-      .map((p: any) => {
-        if ((p.displayName || "").toLowerCase().trim() === "manhack") {
-          return {
-            ...p,
-            totalScore: 0,
-            gamePoints: 0,
-            achievementXp: 0,
-            gamesPlayed: 0,
-            achievementsCount: 0,
-            title: "Recruit"
-          };
-        }
-        return p;
-      });
+    const players = rawPlayers.filter((p: any) => !isOwnerRecord(p));
     res.json({ players });
   });
 
   // POST /api/leaderboard/reset-player - Resets target player account XP and points
   app.post("/api/leaderboard/reset-player", (req, res) => {
     const { targetName } = req.body || {};
-    const nameToReset = (targetName || "Manhack").toLowerCase().trim();
+    const nameToReset = (targetName || "").toLowerCase().trim();
     const currentPlayers = readLeaderboardData();
     let updated = false;
 
     const modified = currentPlayers.map((p: any) => {
       const pName = (p.displayName || "").toLowerCase().trim();
-      if (pName === nameToReset) {
+      if (nameToReset && pName === nameToReset) {
         updated = true;
         return {
           ...p,
@@ -497,47 +310,12 @@ async function startServer() {
       });
     }
 
-    const finalName = body.displayName || "Combine Soldier";
-    const isManhack = finalName.toLowerCase().trim() === "manhack";
-    const isPoisonZombie =
-      finalName.toLowerCase().trim() === "poison zombie" ||
-      finalName.toLowerCase().trim() === "poision zombie";
-
-    const totalScore = isManhack
-      ? 0
-      : isPoisonZombie
-      ? 5000
-      : typeof body.totalScore === "number"
-      ? body.totalScore
-      : (body.achievementXp || 0) + (body.gamePoints || 0);
-    const gamePoints = isManhack
-      ? 0
-      : isPoisonZombie
-      ? 1000
-      : typeof body.gamePoints === "number"
-      ? body.gamePoints
-      : 0;
-    const achievementXp = isManhack
-      ? 0
-      : isPoisonZombie
-      ? 4000
-      : typeof body.achievementXp === "number"
-      ? body.achievementXp
-      : 0;
-    const gamesPlayed = isManhack
-      ? 0
-      : isPoisonZombie
-      ? 0
-      : typeof body.gamesPlayed === "number"
-      ? body.gamesPlayed
-      : 0;
-    const achievementsCount = isManhack
-      ? 0
-      : isPoisonZombie
-      ? 0
-      : typeof body.achievementsCount === "number"
-      ? body.achievementsCount
-      : 0;
+    const finalName = body.displayName || (body.email ? body.email.split('@')[0] : "Player");
+    const gamePoints = typeof body.gamePoints === "number" ? body.gamePoints : 0;
+    const achievementXp = typeof body.achievementXp === "number" ? body.achievementXp : 0;
+    const totalScore = typeof body.totalScore === "number" ? body.totalScore : (achievementXp + gamePoints);
+    const gamesPlayed = typeof body.gamesPlayed === "number" ? body.gamesPlayed : 0;
+    const achievementsCount = typeof body.achievementsCount === "number" ? body.achievementsCount : 0;
 
     const playerRecord = {
       uid: body.uid,
@@ -550,7 +328,7 @@ async function startServer() {
       achievementXp,
       gamesPlayed,
       achievementsCount,
-      title: isManhack ? "Recruit" : isPoisonZombie ? "Recruit" : body.title || "Nexus Member",
+      title: body.title || "Nexus Member",
       avatarBg: body.avatarBg || "bg-gradient-to-br from-indigo-500 to-purple-600",
       isOwner: false,
       updatedAt: new Date().toISOString()

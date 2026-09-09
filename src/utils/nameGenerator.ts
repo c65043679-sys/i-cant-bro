@@ -58,25 +58,20 @@ export function generateGamerTag(seed?: string | null, isOwner?: boolean, email?
     return 'Gordon Freeman';
   }
 
-  if (!seed || seed.trim() === '') {
-    return 'Combine Soldier';
+  if (email && email.includes('@')) {
+    const prefix = email.split('@')[0];
+    if (prefix) return prefix;
   }
 
-  const normalizedSeed = seed.trim().toLowerCase();
-  if (normalizedSeed === 'alexsarsero@gmail.com' || normalizedSeed === 'gordon' || normalizedSeed === 'gordon freeman' || normalizedSeed === 'owner') {
-    return 'Gordon Freeman';
+  if (seed && seed.trim() !== '') {
+    const normalizedSeed = seed.trim();
+    if (normalizedSeed.toLowerCase() === 'alexsarsero@gmail.com' || normalizedSeed.toLowerCase() === 'gordon' || normalizedSeed.toLowerCase() === 'gordon freeman' || normalizedSeed.toLowerCase() === 'owner') {
+      return 'Gordon Freeman';
+    }
+    return normalizedSeed;
   }
 
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
-    hash = (hash << 5) - hash + seed.charCodeAt(i);
-    hash |= 0;
-  }
-
-  const positiveHash = Math.abs(hash);
-  const enemy = HL_ENEMIES[positiveHash % HL_ENEMIES.length];
-
-  return enemy;
+  return 'Player';
 }
 
 export function getHlAccountName(seed?: string | null, isOwner?: boolean, email?: string | null, existingName?: string | null): string {
@@ -84,10 +79,19 @@ export function getHlAccountName(seed?: string | null, isOwner?: boolean, email?
     return 'Gordon Freeman';
   }
 
-  if (existingName && isHlEnemy(existingName)) {
-    return existingName;
+  if (existingName && existingName.trim() && existingName !== 'Nexus Explorer' && existingName !== 'Nexus Member') {
+    return existingName.trim();
   }
 
-  return generateGamerTag(seed, false, email);
+  if (email && email.includes('@')) {
+    const prefix = email.split('@')[0];
+    if (prefix) return prefix;
+  }
+
+  if (seed && seed.trim()) {
+    return seed.trim();
+  }
+
+  return 'Player';
 }
 
