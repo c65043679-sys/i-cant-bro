@@ -262,12 +262,75 @@ async function startServer() {
     return HL_1_AND_2_ENEMIES[Math.abs(hash) % HL_1_AND_2_ENEMIES.length];
   }
 
+  const DEFAULT_SEED_PLAYERS = [
+    {
+      uid: "user_hl_combine_soldier_01",
+      displayName: "Combine Soldier",
+      email: "soldier.overwatch@nexus.net",
+      photoURL: null,
+      equippedAvatar: "initiate_core",
+      totalScore: 450,
+      gamePoints: 150,
+      achievementXp: 300,
+      gamesPlayed: 6,
+      achievementsCount: 3,
+      title: "Overwatch Vanguard",
+      avatarBg: "bg-gradient-to-br from-cyan-600 to-blue-700",
+      isOwner: false
+    },
+    {
+      uid: "HtWaBYKerTSKJJlnAfmP1FTsbJ52",
+      displayName: "Alien Grunt",
+      email: "ilivetomakeslop@gmail.com",
+      photoURL: null,
+      equippedAvatar: "initiate_core",
+      totalScore: 320,
+      gamePoints: 120,
+      achievementXp: 200,
+      gamesPlayed: 4,
+      achievementsCount: 2,
+      title: "Combat Specialist",
+      avatarBg: "bg-gradient-to-br from-emerald-600 to-teal-700",
+      isOwner: false
+    },
+    {
+      uid: "user_hl_vortigaunt_02",
+      displayName: "Vortigaunt",
+      email: "vortigaunt.resistance@nexus.net",
+      photoURL: null,
+      equippedAvatar: "initiate_core",
+      totalScore: 280,
+      gamePoints: 80,
+      achievementXp: 200,
+      gamesPlayed: 3,
+      achievementsCount: 2,
+      title: "Biotic Adept",
+      avatarBg: "bg-gradient-to-br from-purple-600 to-indigo-700",
+      isOwner: false
+    },
+    {
+      uid: "user_hl_metrocop_03",
+      displayName: "Civil Protection Metrocop",
+      email: "civil.protection@nexus.net",
+      photoURL: null,
+      equippedAvatar: "initiate_core",
+      totalScore: 180,
+      gamePoints: 30,
+      achievementXp: 150,
+      gamesPlayed: 2,
+      achievementsCount: 1,
+      title: "City 17 Patrol",
+      avatarBg: "bg-gradient-to-br from-amber-600 to-orange-700",
+      isOwner: false
+    }
+  ];
+
   function readLeaderboardData(): any[] {
     try {
       if (fs.existsSync(LEADERBOARD_FILE)) {
         const raw = fs.readFileSync(LEADERBOARD_FILE, "utf-8");
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
+        if (Array.isArray(parsed) && parsed.length > 0) {
           return parsed
             .filter(p => !isOwnerRecord(p) && !p.uid?.startsWith("hl_combatant_"))
             .map(p => ({
@@ -279,7 +342,7 @@ async function startServer() {
     } catch (e) {
       console.warn("Could not read leaderboard file:", e);
     }
-    return [];
+    return [...DEFAULT_SEED_PLAYERS];
   }
 
   function writeLeaderboardData(data: any[]) {

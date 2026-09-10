@@ -50,6 +50,12 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isSiteAdmin();
     }
+
+    // Shared Cross-Platform Global Leaderboard (Publicly Readable & Synchronizable)
+    match /leaderboard/{playerId} {
+      allow read: if true;
+      allow write: if true;
+    }
   }
 }
 

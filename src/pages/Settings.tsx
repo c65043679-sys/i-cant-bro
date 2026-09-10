@@ -5,6 +5,8 @@ import { useSettings, TAB_CLOAK_PRESETS, CANVAS_THEMES } from '../components/Set
 import { useAchievements } from '../components/AchievementsContext';
 import { generateGamerTag, getHlAccountName, HL_ENEMIES } from '../utils/nameGenerator';
 import { formatPlayTime, formatPlayTimeDetailed } from '../hooks/usePlayTimeTracker';
+import { db } from '../lib/firebase';
+import { doc, setDoc } from 'firebase/firestore';
 import { 
   User as UserIcon, 
   Save, 
@@ -519,6 +521,29 @@ export const Settings: React.FC = () => {
                             await updateProfile({ nickname: enemyName, displayName: enemyName });
                             setNicknameInput(enemyName);
                             localStorage.setItem('username', enemyName);
+                            
+                            // Sync updated handle to Firestore global leaderboard and API
+                            if (db) {
+                              try {
+                                await setDoc(doc(db, 'leaderboard', user.uid), {
+                                  uid: user.uid,
+                                  displayName: enemyName,
+                                  email: user.email || null,
+                                  updatedAt: new Date().toISOString()
+                                }, { merge: true });
+                              } catch (e) {}
+                            }
+
+                            fetch('/api/leaderboard', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                uid: user.uid,
+                                displayName: enemyName,
+                                email: user.email || null
+                              })
+                            }).catch(() => {});
+
                             setMessage(`Half-Life enemy handle set to ${enemyName}!`);
                             setTimeout(() => setMessage(''), 3000);
                           } catch (err) {
@@ -549,7 +574,7 @@ export const Settings: React.FC = () => {
                   </div>
                   <div className="flex justify-between text-slate-400">
                     <span>Account Status</span>
-                    <span className="text-emerald-400 font-bold">Real Player Account</span>
+                    <span className="text-emerald-400 font-bold">Active</span>
                   </div>
                 </div>
 

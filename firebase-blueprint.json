@@ -64,12 +64,34 @@
         "mode": { "type": "string" },
         "triggeredBy": { "type": "string" }
       }
+    },
+    "LeaderboardEntry": {
+      "title": "Leaderboard Entry",
+      "description": "Cross-platform synchronized leaderboard score and progress for an operative",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "equippedAvatar": { "type": "string" },
+        "totalScore": { "type": "number" },
+        "gamePoints": { "type": "number" },
+        "achievementXp": { "type": "number" },
+        "gamesPlayed": { "type": "number" },
+        "achievementsCount": { "type": "number" },
+        "title": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["uid", "displayName", "totalScore"]
     }
   },
   "firestore": {
     "/users/{uid}": {
       "schema": "UserProfile",
       "description": "Collection of user profiles"
+    },
+    "/leaderboard/{playerId}": {
+      "schema": "LeaderboardEntry",
+      "description": "Public real-time global leaderboard entries synchronized across dev, preview, and custom domains"
     },
     "/users/{uid}/saves/{gameId}": {
       "schema": "GameSave",

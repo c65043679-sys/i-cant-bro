@@ -188,24 +188,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             await setDoc(userRef, newProfile);
 
             if (!isUserOwner) {
+              const lbPayload = {
+                uid: user.uid,
+                email: user.email,
+                photoURL: user.photoURL,
+                displayName: defaultName,
+                equippedAvatar: localEquipped,
+                totalScore: 0,
+                achievementXp: 0,
+                gamePoints: 0,
+                gamesPlayed: 0,
+                achievementsCount: 0,
+                title: 'Novice Gamer',
+                isOwner: false,
+                updatedAt: new Date().toISOString()
+              };
+
               fetch('/api/leaderboard', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  uid: user.uid,
-                  email: user.email,
-                  photoURL: user.photoURL,
-                  displayName: defaultName,
-                  equippedAvatar: localEquipped,
-                  totalScore: 0,
-                  achievementXp: 0,
-                  gamePoints: 0,
-                  gamesPlayed: 0,
-                  achievementsCount: 0,
-                  title: 'Novice Gamer',
-                  isOwner: false
-                })
+                body: JSON.stringify(lbPayload)
               }).catch(() => {});
+
+              try {
+                setDoc(doc(db, 'leaderboard', user.uid), lbPayload, { merge: true }).catch(() => {});
+              } catch (e) {}
             }
           } else {
             const data = userDoc.data();

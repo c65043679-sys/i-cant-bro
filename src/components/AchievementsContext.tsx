@@ -488,30 +488,39 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
       }
     }
 
-    // Sync to shared server leaderboard API so all visitors and community members immediately see real player scores
+    // Sync to shared server leaderboard API and Firestore so all visitors across all domains immediately see real player scores
     const userEmail = (curUser?.email || '').toLowerCase().trim();
     const isExcludedOwner = userEmail === 'alexsarsero@gmail.com' || activeUName === 'Gordon Freeman';
     if (!isExcludedOwner) {
+      const payload = {
+        uid: effectiveUid,
+        email: curUser?.email || null,
+        photoURL: curUser?.photoURL || localStorage.getItem('userpic') || null,
+        displayName: activeUName,
+        equippedAvatar: curProfile?.equippedAvatar || localStorage.getItem('nexus_equipped_avatar') || 'initiate_core',
+        totalScore: totalScoreVal,
+        achievementXp: currentXp,
+        gamePoints: effectiveGp,
+        gamesPlayed: effectiveGamesPlayedCount,
+        achievementsCount: isManhackUser ? 0 : (isPZ ? 0 : Object.keys(unlockedRef.current).length),
+        title: currentLevelTitle,
+        isOwner: false,
+        updatedAt: new Date().toISOString()
+      };
+
       try {
         fetch('/api/leaderboard', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            uid: effectiveUid,
-            email: curUser?.email || null,
-            photoURL: curUser?.photoURL || localStorage.getItem('userpic') || null,
-            displayName: activeUName,
-            equippedAvatar: curProfile?.equippedAvatar || localStorage.getItem('nexus_equipped_avatar') || 'initiate_core',
-            totalScore: totalScoreVal,
-            achievementXp: currentXp,
-            gamePoints: effectiveGp,
-            gamesPlayed: effectiveGamesPlayedCount,
-            achievementsCount: isManhackUser ? 0 : (isPZ ? 0 : Object.keys(unlockedRef.current).length),
-            title: currentLevelTitle,
-            isOwner: false
-          })
+          body: JSON.stringify(payload)
         }).catch(() => {});
       } catch (e) {}
+
+      if (db) {
+        try {
+          setDoc(doc(db, 'leaderboard', effectiveUid), payload, { merge: true }).catch(() => {});
+        } catch (e) {}
+      }
     }
   }, []);
 

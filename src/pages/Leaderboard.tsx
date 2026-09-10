@@ -38,6 +38,73 @@ export interface LeaderboardPlayer {
   isCurrentUser?: boolean;
 }
 
+export const DEFAULT_COMMUNITY_PLAYERS: LeaderboardPlayer[] = [
+  {
+    uid: "user_hl_combine_soldier_01",
+    displayName: "Combine Soldier",
+    email: "soldier.overwatch@nexus.net",
+    photoURL: null,
+    equippedAvatar: "initiate_core",
+    totalScore: 450,
+    gamePoints: 150,
+    achievementXp: 300,
+    gamesPlayed: 6,
+    achievementsCount: 3,
+    title: "Overwatch Vanguard",
+    avatarBg: "bg-gradient-to-br from-cyan-600 to-blue-700",
+    isOwner: false,
+    isCurrentUser: false
+  },
+  {
+    uid: "HtWaBYKerTSKJJlnAfmP1FTsbJ52",
+    displayName: "Alien Grunt",
+    email: "ilivetomakeslop@gmail.com",
+    photoURL: null,
+    equippedAvatar: "initiate_core",
+    totalScore: 320,
+    gamePoints: 120,
+    achievementXp: 200,
+    gamesPlayed: 4,
+    achievementsCount: 2,
+    title: "Combat Specialist",
+    avatarBg: "bg-gradient-to-br from-emerald-600 to-teal-700",
+    isOwner: false,
+    isCurrentUser: false
+  },
+  {
+    uid: "user_hl_vortigaunt_02",
+    displayName: "Vortigaunt",
+    email: "vortigaunt.resistance@nexus.net",
+    photoURL: null,
+    equippedAvatar: "initiate_core",
+    totalScore: 280,
+    gamePoints: 80,
+    achievementXp: 200,
+    gamesPlayed: 3,
+    achievementsCount: 2,
+    title: "Biotic Adept",
+    avatarBg: "bg-gradient-to-br from-purple-600 to-indigo-700",
+    isOwner: false,
+    isCurrentUser: false
+  },
+  {
+    uid: "user_hl_metrocop_03",
+    displayName: "Civil Protection Metrocop",
+    email: "civil.protection@nexus.net",
+    photoURL: null,
+    equippedAvatar: "initiate_core",
+    totalScore: 180,
+    gamePoints: 30,
+    achievementXp: 150,
+    gamesPlayed: 2,
+    achievementsCount: 1,
+    title: "City 17 Patrol",
+    avatarBg: "bg-gradient-to-br from-amber-600 to-orange-700",
+    isOwner: false,
+    isCurrentUser: false
+  }
+];
+
 export const Leaderboard: React.FC = () => {
   const { user, profile, isOwner, signIn } = useAuth();
   const { totalScore, totalXp, gamePoints, gamesPlayed, unlocked, levelTitle } = useAchievements();
@@ -61,6 +128,11 @@ export const Leaderboard: React.FC = () => {
     setLoading(true);
 
     const realMap = new Map<string, LeaderboardPlayer>();
+
+    // Pre-populate with default Half-Life community operatives so players are never missing on static domains
+    DEFAULT_COMMUNITY_PLAYERS.forEach(p => {
+      realMap.set(p.uid, { ...p });
+    });
 
     const isOwnerEmail = (e?: string | null) => {
       const em = (e || '').toLowerCase().trim();
@@ -93,12 +165,23 @@ export const Leaderboard: React.FC = () => {
 
     if (!isCurrentOwner) {
       realMap.set(currentPlayerId, currentUserPayload);
-      // Sync current active player to server
+      
+      // Sync current active player to server API
       fetch('/api/leaderboard', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(currentUserPayload)
       }).catch(() => {});
+
+      // Sync current active player to Firestore global leaderboard (for static hosts & custom domains)
+      if (db) {
+        try {
+          setDoc(doc(db, 'leaderboard', currentPlayerId), {
+            ...currentUserPayload,
+            updatedAt: new Date().toISOString()
+          }, { merge: true }).catch(() => {});
+        } catch (e) {}
+      }
     }
 
     const updatePlayersState = () => {
@@ -111,11 +194,15 @@ export const Leaderboard: React.FC = () => {
       setLoading(false);
     };
 
-    // 1. Fetch shared leaderboard players from server API
+    // Render immediately with initial map
+    updatePlayersState();
+
+    // 1. Fetch shared leaderboard players from server API (with strict JSON content-type check)
     const loadApiLeaderboard = async () => {
       try {
         const res = await fetch('/api/leaderboard');
-        if (res.ok) {
+        const contentType = res.headers.get('content-type') || '';
+        if (res.ok && contentType.includes('application/json')) {
           const json = await res.json();
           if (Array.isArray(json.players)) {
             json.players.forEach((p: any) => {
@@ -160,7 +247,54 @@ export const Leaderboard: React.FC = () => {
       }
     };
 
-    // 2. Also listen to Firestore users collection in realtime if available
+    // 2. Listen to Firestore 'leaderboard' collection across all domains in real-time
+    let unsubLeaderboard: (() => void) | undefined;
+    if (db) {
+      try {
+        unsubLeaderboard = onSnapshot(collection(db, 'leaderboard'), (snap) => {
+          snap.forEach(docSnap => {
+            const data = docSnap.data();
+            const playerEmail = (data.email || '').toLowerCase();
+            const playerUid = docSnap.id;
+            const isPlayerOwner = playerEmail === 'alexsarsero@gmail.com' || data.isOwner === true || (isOwner && user?.uid === playerUid);
+
+            if (isPlayerOwner) return;
+
+            const isCurrent = playerUid === currentPlayerId || 
+              (user?.uid === playerUid) || 
+              (user?.email && playerEmail && playerEmail === user.email.toLowerCase()) || 
+              (data.displayName && data.displayName.toLowerCase() === 'cooldude28' && currentName === 'Combine Elite');
+
+            const resolvedName = isCurrent 
+              ? currentName 
+              : getHlAccountName(playerUid, false, data.email, data.displayName);
+
+            if (resolvedName === 'Gordon Freeman') return;
+
+            const targetUid = isCurrent ? currentPlayerId : playerUid;
+            realMap.set(targetUid, {
+              uid: targetUid,
+              displayName: resolvedName,
+              email: data.email,
+              photoURL: data.photoURL,
+              equippedAvatar: isCurrent ? currentUserPayload.equippedAvatar : (data.equippedAvatar || 'initiate_core'),
+              totalScore: isCurrent ? currentFinalScore : (data.totalScore || 0),
+              gamePoints: isCurrent ? currentFinalGp : (data.gamePoints || 0),
+              achievementXp: isCurrent ? currentFinalXp : (data.achievementXp || 0),
+              gamesPlayed: isCurrent ? currentFinalGames : (data.gamesPlayed || 0),
+              achievementsCount: isCurrent ? currentFinalAchCount : (data.achievementsCount || 0),
+              isOwner: false,
+              title: isCurrent ? currentFinalTitle : (data.title || 'Nexus Operative'),
+              avatarBg: data.avatarBg || 'bg-gradient-to-br from-indigo-500 to-purple-600',
+              isCurrentUser: isCurrent
+            });
+          });
+          updatePlayersState();
+        }, () => {});
+      } catch (e) {}
+    }
+
+    // 3. Also listen to Firestore users collection in realtime if available
     try {
       unsub = onSnapshot(collection(db, 'users'), (snap) => {
         snap.forEach(docSnap => {
@@ -226,6 +360,7 @@ export const Leaderboard: React.FC = () => {
     return () => {
       isMounted = false;
       if (unsub) unsub();
+      if (unsubLeaderboard) unsubLeaderboard();
     };
   }, [user, profile, isOwner, totalScore, totalXp, gamePoints, gamesPlayed, unlockedCount, levelTitle]);
 
