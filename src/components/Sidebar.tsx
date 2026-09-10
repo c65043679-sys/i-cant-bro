@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { LayoutGrid, Flame, Car, Gamepad, Puzzle, User as UserIcon, LogIn, LogOut, Skull, Trophy, Star, Settings, Lock, Unlock, History, PlusCircle, BarChart3, Medal, Package } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Category } from '../types';
 import { useAuth } from './AuthContext';
 import { AvatarDisplay } from './AvatarDisplay';
+import { getAllGames } from '../utils/getAllGames';
 
 interface SidebarProps {
   activeCategory: Category;
@@ -13,8 +14,6 @@ interface SidebarProps {
 const CATEGORIES: { id: Category; name: string; icon: React.ReactNode }[] = [
   { id: 'all', name: 'All Games', icon: <LayoutGrid className="w-5 h-5" /> },
   { id: 'Favorites', name: 'My Favorites', icon: <Star className="w-5 h-5" /> },
-  { id: 'Unblocked', name: 'Unblocked', icon: <Unlock className="w-5 h-5" /> },
-  { id: 'Blocked', name: 'Blocked', icon: <Lock className="w-5 h-5" /> },
   { id: 'Action', name: 'Action', icon: <Flame className="w-5 h-5" /> },
   { id: 'Racing', name: 'Racing', icon: <Car className="w-5 h-5" /> },
   { id: 'Arcade', name: 'Arcade', icon: <Gamepad className="w-5 h-5" /> },
@@ -28,13 +27,25 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeCategory, onCategoryChan
   const location = useLocation();
   const navigate = useNavigate();
 
+  const [blockedCount, setBlockedCount] = useState(() => {
+    return getAllGames().filter((g) => g.isBlocked).length;
+  });
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      setBlockedCount(getAllGames().filter((g) => g.isBlocked).length);
+    };
+    window.addEventListener('nexus_games_updated', handleUpdate);
+    return () => window.removeEventListener('nexus_games_updated', handleUpdate);
+  }, []);
+
   return (
     <aside className="w-[240px] shrink-0 hidden md:flex flex-col p-6 border-r border-white/10 bg-slate-900/40 backdrop-blur-md min-h-screen gap-6">
       <div>
         <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Discover</p>
         <ul className="space-y-1">
           {CATEGORIES.map((cat) => {
-            const isActive = activeCategory === cat.id;
+            const isActive = location.pathname === '/' && activeCategory === cat.id;
             return (
               <li
                 key={cat.id}
@@ -77,6 +88,34 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeCategory, onCategoryChan
             );
           })}
         </ul>
+
+        {/* Dedicated Blocked Games Section */}
+        {blockedCount > 0 && (
+          <div className="pt-4 mt-4 border-t border-white/5">
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Restricted</p>
+            <Link
+              to="/blocked"
+              onPointerEnter={() => {
+                if (document.activeElement?.tagName?.toLowerCase() === 'iframe') {
+                  try { (document.activeElement as HTMLElement)?.blur(); window.focus(); } catch (e) {}
+                }
+              }}
+              className={`flex items-center justify-between px-3 py-2.5 rounded-lg border transition-all cursor-pointer ${
+                location.pathname === '/blocked'
+                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/40 font-semibold shadow-sm'
+                  : 'text-slate-400 border-transparent hover:text-rose-300 hover:bg-rose-500/10'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Lock className="w-5 h-5 text-rose-400" />
+                <span className="text-sm font-medium">Blocked Games</span>
+              </div>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                {blockedCount}
+              </span>
+            </Link>
+          </div>
+        )}
       </div>
 
       <div className="mt-auto pt-6 border-t border-white/5">

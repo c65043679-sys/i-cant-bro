@@ -13,6 +13,7 @@ import { AchievementsProvider } from './components/AchievementsContext';
 import { Achievements } from './pages/Achievements';
 import { Leaderboard } from './pages/Leaderboard';
 import { CasesAndInventory } from './pages/CasesAndInventory';
+import { BlockedGames } from './pages/BlockedGames';
 import { FpsCounter } from './components/FpsCounter';
 import { PanicOverlay } from './components/PanicOverlay';
 import { BroadcastBanner } from './components/BroadcastBanner';
@@ -101,7 +102,7 @@ function AppContent() {
 
       <div className="relative z-10 flex flex-col min-h-screen">
         <BroadcastBanner />
-        <Navbar onSearch={setSearchQuery} />
+        <Navbar onSearch={setSearchQuery} searchQuery={searchQuery} />
         
         <main className="flex flex-1 overflow-hidden">
           <Sidebar 
@@ -120,6 +121,7 @@ function AppContent() {
                   />
                 } 
               />
+              <Route path="/blocked" element={<BlockedGames searchQuery={searchQuery} />} />
               <Route path="/play/:id" element={<Play />} />
               <Route path="/cases" element={<CasesAndInventory />} />
               <Route path="/achievements" element={<Achievements />} />
