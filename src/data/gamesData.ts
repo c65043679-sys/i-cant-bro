@@ -197,7 +197,7 @@ export const GAMES: Game[] = [
     thumbnail: "/images/MotoX3M_OG-logo.jpg",
     color: "#f97316",
     category: "Racing",
-    iframe: "https://html5.gamedistribution.com/5b0abd4c0faa4f5eb190a9a16d5a1b4c/?gd_sdk_referrer_url=https://www.example.com/games/{game-path}",
+    iframe: "https://hub-pro.github.io/games/motox3m/index.html",
     controls: "Up arrow or W to accelerate, Down arrow or S to brake, Left/Right arrows or A/D to tilt and balance.",
     rating: 4.8,
     featured: true,
@@ -1031,22 +1031,5 @@ export const GAMES: Game[] = [
     aspectRatio: "five-four",
     nativeWidth: 1000,
     nativeHeight: 800
-  },
-  {
-    id: "worldguessr",
-    title: "WorldGuessr",
-    description: "Drop into unknown locations across the globe! Inspect 360° Street View panoramas, landmarks, road signs, and terrain to pinpoint your exact location on the world map.",
-    thumbnail: "/images/WorldGuessr thumbnail.jpg",
-    color: "#0ea5e9",
-    category: "Puzzle",
-    iframe: "https://html5.gamedistribution.com/fef00656129743768437b7589b7c48b1/?gd_sdk_referrer_url=https://www.example.com/games/{game-path}",
-    controls: "Click and drag to look around 360°. Scroll wheel to zoom. Click the mini-map to place your pin and submit your guess.",
-    rating: 4.9,
-    trending: true,
-    aspectRatio: "four-three",
-    nativeWidth: 800,
-    nativeHeight: 600,
-    allow: "autoplay; fullscreen; camera; focus-without-user-activation *; monetization; gamepad; keyboard-map *; xr-spatial-tracking; clipboard-write; geolocation",
-    sandbox: "allow-forms allow-modals allow-orientation-lock allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-presentation allow-scripts allow-same-origin allow-downloads"
   }
 ];
