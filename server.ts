@@ -220,13 +220,60 @@ async function startServer() {
     );
   }
 
+  const HL_1_AND_2_ENEMIES = [
+    'Headcrab', 'Headcrab Zombie', 'Barnacle', 'Houndeye', 'Bullsquid',
+    'Vortigaunt', 'Alien Grunt', 'Alien Controller', 'Gargantua', 'Tentacle',
+    'Ichthyosaur', 'Snark', 'HECU Grunt', 'Black Ops Assassin', 'Sentry Turret', 'Nihilanth',
+    'Combine Soldier', 'Combine Elite', 'Civil Protection Metrocop', 'Combine Shotgunner',
+    'Combine Sniper', 'Fast Headcrab', 'Poison Headcrab', 'Fast Zombie', 'Poison Zombie',
+    'Zombine', 'Antlion', 'Antlion Guard', 'Antlion Worker', 'Hunter', 'Strider',
+    'Combine Gunship', 'Combine Dropship', 'Combine Advisor', 'Stalker', 'Manhack',
+    'City Scanner', 'Shield Scanner', 'Rollermine', 'Crab Synth', 'Mortar Synth'
+  ];
+
+  function resolveHlName(name: string, email?: string | null): string {
+    const normEmail = (email || '').toLowerCase().trim();
+    const normName = (name || '').toLowerCase().trim();
+    if (
+      normName === 'cooldude28' || 
+      normName.includes('cooldude') || 
+      normEmail === 'c65043679@gmail.com' ||
+      normName === 'barney calhoun'
+    ) {
+      return 'Combine Elite';
+    }
+    if (
+      normEmail === 'ilivetomakeslop@gmail.com' || 
+      normName === 'ilivetomakeslop' ||
+      normName === 'adrian shephard'
+    ) {
+      return 'Alien Grunt';
+    }
+    const isEnemy = HL_1_AND_2_ENEMIES.some(e => e.toLowerCase() === normName);
+    if (isEnemy) {
+      return name;
+    }
+    let hash = 0;
+    const seed = normEmail || normName || 'player';
+    for (let i = 0; i < seed.length; i++) {
+      hash = ((hash << 5) - hash) + seed.charCodeAt(i);
+      hash |= 0;
+    }
+    return HL_1_AND_2_ENEMIES[Math.abs(hash) % HL_1_AND_2_ENEMIES.length];
+  }
+
   function readLeaderboardData(): any[] {
     try {
       if (fs.existsSync(LEADERBOARD_FILE)) {
         const raw = fs.readFileSync(LEADERBOARD_FILE, "utf-8");
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
-          return parsed.filter(p => !isOwnerRecord(p) && !p.uid?.startsWith("hl_combatant_"));
+          return parsed
+            .filter(p => !isOwnerRecord(p) && !p.uid?.startsWith("hl_combatant_"))
+            .map(p => ({
+              ...p,
+              displayName: resolveHlName(p.displayName, p.email)
+            }));
         }
       }
     } catch (e) {
@@ -310,7 +357,8 @@ async function startServer() {
       });
     }
 
-    const finalName = body.displayName || (body.email ? body.email.split('@')[0] : "Player");
+    const rawName = body.displayName || (body.email ? body.email.split('@')[0] : "Player");
+    const finalName = resolveHlName(rawName, body.email);
     const gamePoints = typeof body.gamePoints === "number" ? body.gamePoints : 0;
     const achievementXp = typeof body.achievementXp === "number" ? body.achievementXp : 0;
     const totalScore = typeof body.totalScore === "number" ? body.totalScore : (achievementXp + gamePoints);

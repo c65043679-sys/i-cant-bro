@@ -6,6 +6,7 @@ import { soundManager } from '../utils/soundEffects';
 import { doc, setDoc, onSnapshot, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { containsProfanity } from '../utils/profanityFilter';
+import { getHlAccountName } from '../utils/nameGenerator';
 import { Trophy, Star, Sparkles, Zap, Crown, ShieldAlert, Palette, Eye, Radio, Flame, Lock, Unlock, CheckCircle2, Rocket } from 'lucide-react';
 
 export interface Achievement {
@@ -430,10 +431,12 @@ export const AchievementsProvider: React.FC<{ children: React.ReactNode }> = ({ 
       return gen;
     })();
 
-    let activeUName = curProfile?.nickname || curProfile?.displayName || localStorage.getItem('username') || 'Nexus Explorer';
-    if (containsProfanity(activeUName) || activeUName.toLowerCase().includes('sarsero')) {
-      activeUName = 'Nexus Explorer';
+    let rawUName = curProfile?.nickname || curProfile?.displayName || localStorage.getItem('username') || 'Nexus Explorer';
+    if (containsProfanity(rawUName) || rawUName.toLowerCase().includes('sarsero')) {
+      rawUName = 'Nexus Explorer';
     }
+    const isOwnerUser = (curUser?.email?.toLowerCase().trim() === 'alexsarsero@gmail.com') || (sessionStorage.getItem('isOwner') === 'true');
+    let activeUName = getHlAccountName(effectiveUid, isOwnerUser, curUser?.email, rawUName);
     const isPZ = activeUName.toLowerCase().trim() === 'poison zombie' || activeUName.toLowerCase().trim() === 'poision zombie';
     const isManhackUser = activeUName.toLowerCase().trim() === 'manhack';
 

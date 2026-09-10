@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { useAuth } from '../components/AuthContext';
 import { useSettings, TAB_CLOAK_PRESETS, CANVAS_THEMES } from '../components/SettingsContext';
 import { useAchievements } from '../components/AchievementsContext';
-import { generateGamerTag, getHlAccountName } from '../utils/nameGenerator';
+import { generateGamerTag, getHlAccountName, HL_ENEMIES } from '../utils/nameGenerator';
 import { formatPlayTime, formatPlayTimeDetailed } from '../hooks/usePlayTimeTracker';
 import { 
   User as UserIcon, 
@@ -56,14 +56,15 @@ export const Settings: React.FC = () => {
   const [message, setMessage] = useState('');
   const [showWipeModal, setShowWipeModal] = useState(false);
   const [isWipingProgress, setIsWipingProgress] = useState(false);
-  const [nicknameInput, setNicknameInput] = useState(profile?.nickname || user?.displayName || '');
+  const [nicknameInput, setNicknameInput] = useState(() => 
+    getHlAccountName(user?.uid, isOwner, user?.email, profile?.nickname || user?.displayName || localStorage.getItem('username'))
+  );
   const [isSavingName, setIsSavingName] = useState(false);
 
   useEffect(() => {
-    if (profile?.nickname || user?.displayName) {
-      setNicknameInput(profile?.nickname || user?.displayName || '');
-    }
-  }, [profile?.nickname, user?.displayName]);
+    const hlName = getHlAccountName(user?.uid, isOwner, user?.email, profile?.nickname || user?.displayName || localStorage.getItem('username'));
+    setNicknameInput(hlName);
+  }, [profile?.nickname, profile?.displayName, user?.displayName, user?.uid, user?.email, isOwner]);
 
   const handleWipeAllProgress = async () => {
     setIsWipingProgress(true);
@@ -487,40 +488,57 @@ export const Settings: React.FC = () => {
             {user ? (
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-400 mb-2">Display Name / Handle</label>
+                  <label className="block text-xs font-bold text-slate-400 mb-2">
+                    {isOwner ? 'Account Persona (Owner)' : 'Half-Life 1 & 2 Enemy Operative'}
+                  </label>
                   <div className="flex gap-2">
                     <input
                       type="text"
+                      list={isOwner ? undefined : "hl-enemies-list"}
                       value={nicknameInput}
                       onChange={(e) => setNicknameInput(e.target.value)}
-                      placeholder="Your custom username"
-                      maxLength={24}
-                      className="flex-1 bg-black/40 border border-white/10 rounded-xl px-3.5 py-2 text-sm text-white font-bold font-mono focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                      placeholder={isOwner ? "Gordon Freeman" : "Select or type Half-Life enemy..."}
+                      maxLength={28}
+                      disabled={isOwner}
+                      className="flex-1 bg-black/40 border border-white/10 rounded-xl px-3.5 py-2 text-sm text-white font-bold font-mono focus:outline-none focus:ring-2 focus:ring-[var(--accent)] disabled:opacity-60"
                     />
-                    <button
-                      onClick={async () => {
-                        if (!nicknameInput.trim()) return;
-                        setIsSavingName(true);
-                        try {
-                          await updateProfile({ nickname: nicknameInput.trim(), displayName: nicknameInput.trim() });
-                          localStorage.setItem('username', nicknameInput.trim());
-                          setMessage('Display handle updated successfully!');
-                          setTimeout(() => setMessage(''), 3000);
-                        } catch (err) {
-                          console.error(err);
-                        } finally {
-                          setIsSavingName(false);
-                        }
-                      }}
-                      disabled={isSavingName || !nicknameInput.trim()}
-                      className="px-3.5 py-2 bg-[var(--accent)] hover:brightness-110 text-black font-black text-xs rounded-xl transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
-                    >
-                      <Save className="w-3.5 h-3.5" />
-                      Save
-                    </button>
+                    {!isOwner && (
+                      <datalist id="hl-enemies-list">
+                        {HL_ENEMIES.map(enemy => (
+                          <option key={enemy} value={enemy} />
+                        ))}
+                      </datalist>
+                    )}
+                    {!isOwner && (
+                      <button
+                        onClick={async () => {
+                          if (!nicknameInput.trim()) return;
+                          setIsSavingName(true);
+                          try {
+                            const enemyName = getHlAccountName(user.uid, false, user.email, nicknameInput.trim());
+                            await updateProfile({ nickname: enemyName, displayName: enemyName });
+                            setNicknameInput(enemyName);
+                            localStorage.setItem('username', enemyName);
+                            setMessage(`Half-Life enemy handle set to ${enemyName}!`);
+                            setTimeout(() => setMessage(''), 3000);
+                          } catch (err) {
+                            console.error(err);
+                          } finally {
+                            setIsSavingName(false);
+                          }
+                        }}
+                        disabled={isSavingName || !nicknameInput.trim()}
+                        className="px-3.5 py-2 bg-[var(--accent)] hover:brightness-110 text-black font-black text-xs rounded-xl transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                      >
+                        <Save className="w-3.5 h-3.5" />
+                        Save
+                      </button>
+                    )}
                   </div>
                   <p className="text-[11px] text-slate-400 mt-1.5">
-                    This name is displayed on your achievements and the Hall of Champions leaderboard.
+                    {isOwner 
+                      ? 'Owner persona is designated as Gordon Freeman and permanently excluded from competition standings.' 
+                      : 'All players must be authentic enemies from Half-Life 1 and Half-Life 2 (e.g., Combine Elite, Alien Grunt, Fast Zombie).'}
                   </p>
                 </div>
 

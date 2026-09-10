@@ -3,7 +3,7 @@ import { User, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut,
 import { auth, db } from '../lib/firebase';
 import { doc, getDoc, setDoc, serverTimestamp, updateDoc, arrayUnion, arrayRemove, onSnapshot, increment } from 'firebase/firestore';
 import { containsProfanity } from '../utils/profanityFilter';
-import { generateGamerTag } from '../utils/nameGenerator';
+import { generateGamerTag, getHlAccountName } from '../utils/nameGenerator';
 import { AVATARS_CATALOG } from '../data/avatarsData';
 
 export interface UserProfile {
@@ -120,14 +120,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (user) {
         setUser(user);
         const isUserOwner = (user.email?.toLowerCase() === 'alexsarsero@gmail.com') || (sessionStorage.getItem('isOwner') === 'true');
-        const realAccountName = isUserOwner
+        const rawAccountName = isUserOwner
           ? 'Gordon Freeman'
           : (user.displayName || (user.email ? user.email.split('@')[0] : 'Player'));
         
         const existingLocalName = localStorage.getItem('username');
-        const defaultName = (existingLocalName && existingLocalName !== 'Nexus Explorer' && existingLocalName !== 'Nexus Member')
+        const candidateName = (existingLocalName && existingLocalName !== 'Nexus Explorer' && existingLocalName !== 'Nexus Member')
           ? existingLocalName
-          : realAccountName;
+          : rawAccountName;
+        
+        // Resolve authoritative Half-Life operative handle (e.g., cooldude28 -> Barney Calhoun, Gordon Freeman for owner)
+        const defaultName = getHlAccountName(user.uid, isUserOwner, user.email, candidateName);
         localStorage.setItem('username', defaultName);
 
         let localFavs: string[] = [];
@@ -183,13 +186,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               updatedAt: serverTimestamp(),
             };
             await setDoc(userRef, newProfile);
+
+            if (!isUserOwner) {
+              fetch('/api/leaderboard', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  uid: user.uid,
+                  email: user.email,
+                  photoURL: user.photoURL,
+                  displayName: defaultName,
+                  equippedAvatar: localEquipped,
+                  totalScore: 0,
+                  achievementXp: 0,
+                  gamePoints: 0,
+                  gamesPlayed: 0,
+                  achievementsCount: 0,
+                  title: 'Novice Gamer',
+                  isOwner: false
+                })
+              }).catch(() => {});
+            }
           } else {
             const data = userDoc.data();
             const updates: any = {};
             const existingName = data?.nickname || data?.displayName;
-            if (!existingName) {
-              updates.nickname = defaultName;
-              updates.displayName = defaultName;
+            const hlExistingName = getHlAccountName(user.uid, isUserOwner, user.email, existingName);
+            if (!existingName || existingName !== hlExistingName) {
+              updates.nickname = hlExistingName;
+              updates.displayName = hlExistingName;
+              localStorage.setItem('username', hlExistingName);
             } else {
               localStorage.setItem('username', existingName);
             }
@@ -206,6 +232,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (!data?.uid) updates.uid = user.uid;
             if (Object.keys(updates).length > 0) {
               await setDoc(userRef, updates, { merge: true });
+            }
+
+            if (!isUserOwner) {
+              fetch('/api/leaderboard', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  uid: user.uid,
+                  email: user.email,
+                  photoURL: user.photoURL,
+                  displayName: hlExistingName,
+                  equippedAvatar: updates.equippedAvatar || data?.equippedAvatar || 'initiate_core',
+                  totalScore: typeof data?.totalScore === 'number' ? data.totalScore : 0,
+                  achievementXp: typeof data?.totalXp === 'number' ? data.totalXp : 0,
+                  gamePoints: typeof data?.gamePoints === 'number' ? data.gamePoints : 0,
+                  gamesPlayed: typeof data?.gamesPlayed === 'number' ? data.gamesPlayed : 0,
+                  achievementsCount: typeof data?.achievementsCount === 'number' ? data.achievementsCount : 0,
+                  title: data?.title || 'Novice Gamer',
+                  isOwner: false
+                })
+              }).catch(() => {});
             }
           }
 
@@ -411,9 +458,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const isUserOwner = (user?.email?.toLowerCase() === 'alexsarsero@gmail.com') || isOwnerUnlocked;
     const requestedName = data.nickname?.trim() || data.displayName?.trim();
     const fallbackName = user?.displayName || (user?.email ? user.email.split('@')[0] : 'Player');
+    const rawCandidate = requestedName || localStorage.getItem('username') || fallbackName;
     const chosenName = isUserOwner 
       ? 'Gordon Freeman'
-      : (requestedName || localStorage.getItem('username') || fallbackName);
+      : getHlAccountName(user?.uid, isUserOwner, user?.email, rawCandidate);
     localStorage.setItem('username', chosenName);
 
     // Update local React state optimistically so UI updates immediately across all screens

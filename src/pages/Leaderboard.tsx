@@ -52,7 +52,7 @@ export const Leaderboard: React.FC = () => {
   const currentPlayerId = user?.uid || localStorage.getItem('nexus_player_id') || 'player_active';
   const currentName = (user?.email?.toLowerCase().trim() === 'alexsarsero@gmail.com')
     ? 'Gordon Freeman'
-    : (profile?.nickname || profile?.displayName || user?.displayName || (user?.email ? user.email.split('@')[0] : null) || localStorage.getItem('username') || 'Player');
+    : getHlAccountName(user?.uid, false, user?.email, profile?.nickname || profile?.displayName || user?.displayName || (user?.email ? user.email.split('@')[0] : null) || localStorage.getItem('username'));
   const isCurrentOwner = (user?.email?.toLowerCase().trim() === 'alexsarsero@gmail.com') || currentName === 'Gordon Freeman';
 
   useEffect(() => {
@@ -119,16 +119,25 @@ export const Leaderboard: React.FC = () => {
           const json = await res.json();
           if (Array.isArray(json.players)) {
             json.players.forEach((p: any) => {
-              const isCurrent = p.uid === currentPlayerId || (user?.email && p.email === user.email) || p.displayName === currentName;
+              const isCurrent = p.uid === currentPlayerId || 
+                (user?.uid && p.uid === user.uid) || 
+                (user?.email && p.email && p.email.toLowerCase() === user.email.toLowerCase()) || 
+                p.displayName === currentName || 
+                (p.displayName && p.displayName.toLowerCase() === 'cooldude28' && currentName === 'Combine Elite');
+
               const isExcludedOwner = p.isOwner || isOwnerEmail(p.email) || (isCurrent && isCurrentOwner) || p.displayName === 'Gordon Freeman';
               if (isExcludedOwner) return; // Permanently skip owner
 
-              const playerDisplayName = isCurrent ? currentName : (p.displayName || (p.email ? p.email.split('@')[0] : 'Player'));
-              if (playerDisplayName === 'Gordon Freeman') return;
+              const resolvedName = isCurrent 
+                ? currentName 
+                : getHlAccountName(p.uid, false, p.email, p.displayName);
 
-              realMap.set(p.uid, {
-                uid: p.uid,
-                displayName: playerDisplayName,
+              if (resolvedName === 'Gordon Freeman') return;
+
+              const targetUid = isCurrent ? currentPlayerId : p.uid;
+              realMap.set(targetUid, {
+                uid: targetUid,
+                displayName: resolvedName,
                 email: p.email,
                 photoURL: p.photoURL,
                 equippedAvatar: isCurrent ? currentUserPayload.equippedAvatar : (p.equippedAvatar || 'initiate_core'),
@@ -163,24 +172,32 @@ export const Leaderboard: React.FC = () => {
           // Skip owner account
           if (isPlayerOwner) return;
 
-          const playerDisplayName = data.nickname || data.displayName || (data.email ? data.email.split('@')[0] : 'Player');
-          if (playerDisplayName === 'Gordon Freeman') return;
+          const isCurrent = playerUid === currentPlayerId || 
+            (user?.uid === playerUid) || 
+            (user?.email && playerEmail && playerEmail === user.email.toLowerCase()) || 
+            (data.displayName && data.displayName.toLowerCase() === 'cooldude28' && currentName === 'Combine Elite');
+
+          const resolvedName = isCurrent 
+            ? currentName 
+            : getHlAccountName(playerUid, false, data.email, data.nickname || data.displayName);
+
+          if (resolvedName === 'Gordon Freeman') return;
 
           let pXp = typeof data.totalXp === 'number' ? data.totalXp : (data.achievementsCount || 0) * 150;
           let pGp = typeof data.gamePoints === 'number' ? data.gamePoints : 0;
           let pGamesPlayed = typeof data.gamesPlayed === 'number' ? data.gamesPlayed : 0;
           let pAchCount = typeof data.achievementsCount === 'number' ? data.achievementsCount : 0;
 
-          const isCurrent = playerUid === currentPlayerId || (user?.uid === playerUid);
           let finalTot = isCurrent ? currentFinalScore : (data.totalScore || (pXp + pGp));
           let finalGp = isCurrent ? currentFinalGp : pGp;
           let finalXp = isCurrent ? currentFinalXp : pXp;
           let finalGames = isCurrent ? currentFinalGames : pGamesPlayed;
           let finalAchCount = isCurrent ? currentFinalAchCount : pAchCount;
 
-          realMap.set(playerUid, {
-            uid: playerUid,
-            displayName: isCurrent ? currentName : playerDisplayName,
+          const targetUid = isCurrent ? currentPlayerId : playerUid;
+          realMap.set(targetUid, {
+            uid: targetUid,
+            displayName: resolvedName,
             email: data.email,
             photoURL: data.photoURL,
             equippedAvatar: isCurrent ? currentUserPayload.equippedAvatar : (data.equippedAvatar || 'initiate_core'),
@@ -534,16 +551,11 @@ export const Leaderboard: React.FC = () => {
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-3">
                           <AvatarDisplay avatarId={player.equippedAvatar} size="sm" />
-                          <div>
-                            <div className="flex items-center gap-1.5 font-bold text-white">
-                              <span>{player.displayName}</span>
-                              {isUser && (
-                                <span className="px-1.5 py-0.5 bg-indigo-600 text-white text-[9px] font-mono rounded uppercase">YOU</span>
-                              )}
-                            </div>
-                            <p className="text-[10px] text-slate-400 font-mono">
-                              {player.email ? 'Real Player Account' : 'Community Member'}
-                            </p>
+                          <div className="flex items-center gap-1.5 font-bold text-white">
+                            <span>{player.displayName}</span>
+                            {isUser && (
+                              <span className="px-1.5 py-0.5 bg-indigo-600 text-white text-[9px] font-mono rounded uppercase">YOU</span>
+                            )}
                           </div>
                         </div>
                       </td>
