@@ -78,5 +78,21 @@
     "avatarBg": "bg-gradient-to-br from-amber-600 to-orange-700",
     "isOwner": false,
     "updatedAt": "2026-09-10T07:50:00.000Z"
+  },
+  {
+    "uid": "player_sos5qza38",
+    "displayName": "Combine Sniper",
+    "email": null,
+    "photoURL": null,
+    "equippedAvatar": "initiate_core",
+    "totalScore": 100,
+    "gamePoints": 0,
+    "achievementXp": 100,
+    "gamesPlayed": 0,
+    "achievementsCount": 1,
+    "title": "Novice Gamer",
+    "avatarBg": "bg-gradient-to-br from-indigo-500 to-purple-600",
+    "isOwner": false,
+    "updatedAt": "2026-09-11T02:18:07.559Z"
   }
 ]
