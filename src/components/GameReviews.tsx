@@ -22,6 +22,7 @@ import {
   query, 
   where, 
   onSnapshot, 
+  getDocs,
   setDoc, 
   doc, 
   deleteDoc, 
@@ -91,7 +92,68 @@ export const GameReviews: React.FC<GameReviewsProps> = ({ gameId, gameTitle }) =
 
     setReviews(cachedReviews);
 
-    // Subscribe to live Firestore collection
+    // Auto-sync any locally cached review belonging to the logged-in user to Firestore cloud if not already synced
+    if (db && user) {
+      const myLocal = cachedReviews.find(r => r.userId === user.uid);
+      if (myLocal) {
+        const syncPayload = {
+          id: myLocal.id,
+          gameId: myLocal.gameId || gameId,
+          userId: myLocal.userId,
+          userName: myLocal.userName || authorDisplayName,
+          userAvatar: myLocal.userAvatar || profile?.photoURL || user.photoURL || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(user.uid)}`,
+          comment: myLocal.comment || '',
+          helpfulCount: Number(myLocal.helpfulCount) || 0,
+          likedBy: Array.isArray(myLocal.likedBy) ? myLocal.likedBy : [],
+          createdAt: Number(myLocal.createdAt) || Date.now()
+        };
+        setDoc(doc(db, 'game_reviews', myLocal.id), syncPayload, { merge: true })
+          .then(() => console.log('[GameReviews] Auto-synced previous review to Firestore cloud:', myLocal.id))
+          .catch(e => console.warn('[GameReviews] Auto-sync notice:', e));
+      }
+    }
+
+    // Direct Firestore fetch via getDocs for instant availability across devices
+    if (db) {
+      const reviewsRef = collection(db, 'game_reviews');
+      const q = query(reviewsRef, where('gameId', '==', gameId));
+      getDocs(q).then((snapshot) => {
+        if (!snapshot.empty) {
+          const directReviews: GameReview[] = [];
+          snapshot.forEach((docSnap) => {
+            const data = docSnap.data();
+            if (docSnap.id.startsWith('seed_') || data.userId?.startsWith('seed-')) return;
+            directReviews.push({
+              id: docSnap.id,
+              gameId: data.gameId || gameId,
+              userId: data.userId || 'anon',
+              userName: data.userName || 'Nexus Operative',
+              userAvatar: data.userAvatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(data.userId || 'user')}`,
+              comment: data.comment || '',
+              helpfulCount: Number(data.helpfulCount) || 0,
+              likedBy: Array.isArray(data.likedBy) ? data.likedBy : [],
+              createdAt: Number(data.createdAt) || Date.now()
+            });
+          });
+
+          setReviews(prev => {
+            const map = new Map<string, GameReview>();
+            directReviews.forEach(r => map.set(r.id, r));
+            prev.forEach(r => { if (!map.has(r.id)) map.set(r.id, r); });
+            const merged = Array.from(map.values());
+            try {
+              localStorage.setItem(localKey, JSON.stringify(merged));
+            } catch (e) {}
+            return merged;
+          });
+          setLoading(false);
+        }
+      }).catch(err => {
+        console.warn('[GameReviews] Direct fetch getDocs notice:', err);
+      });
+    }
+
+    // Subscribe to live Firestore collection for real-time updates across screens
     let unsubscribe: (() => void) | null = null;
     try {
       if (db) {
@@ -111,11 +173,11 @@ export const GameReviews: React.FC<GameReviewsProps> = ({ gameId, gameTitle }) =
               gameId: data.gameId || gameId,
               userId: data.userId || 'anon',
               userName: data.userName || 'Nexus Operative',
-              userAvatar: data.userAvatar,
+              userAvatar: data.userAvatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(data.userId || 'user')}`,
               comment: data.comment || '',
               helpfulCount: Number(data.helpfulCount) || 0,
               likedBy: Array.isArray(data.likedBy) ? data.likedBy : [],
-              createdAt: data.createdAt || Date.now()
+              createdAt: Number(data.createdAt) || Date.now()
             });
           });
 
@@ -126,7 +188,7 @@ export const GameReviews: React.FC<GameReviewsProps> = ({ gameId, gameTitle }) =
             localStorage.setItem(localKey, JSON.stringify(remoteReviews));
           } catch (e) {}
         }, (err) => {
-          console.warn('Firestore game_reviews listener warning:', err);
+          console.error('[GameReviews] Firestore game_reviews listener error:', err);
           setLoading(false);
         });
       } else {
@@ -140,7 +202,7 @@ export const GameReviews: React.FC<GameReviewsProps> = ({ gameId, gameTitle }) =
     return () => {
       if (unsubscribe) unsubscribe();
     };
-  }, [gameId]);
+  }, [gameId, user?.uid]);
 
   // Open Form Handler: pre-populates existing review if user already reviewed this game
   const handleOpenForm = () => {
@@ -157,7 +219,7 @@ export const GameReviews: React.FC<GameReviewsProps> = ({ gameId, gameTitle }) =
     setIsFormOpen(prev => !prev);
   };
 
-  // Submit Review Handler (Enforces 1 review per user per game; edits if existing)
+  // Submit Review Handler (Enforces 1 review per user per game; writes cleanly to Firestore)
   const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) {
@@ -175,21 +237,22 @@ export const GameReviews: React.FC<GameReviewsProps> = ({ gameId, gameTitle }) =
     // Use deterministic ID per user per game to enforce 1-review guarantee at database level
     const reviewId = existingUserReview ? existingUserReview.id : `rev_${gameId}_${user.uid}`;
     
-    const newReview: GameReview = {
-      id: reviewId,
-      gameId,
-      userId: user.uid,
-      userName: authorName,
-      userAvatar: profile?.photoURL || user.photoURL || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(user.uid)}`,
-      comment: commentText.trim(),
-      helpfulCount: existingUserReview ? existingUserReview.helpfulCount : 0,
-      likedBy: existingUserReview?.likedBy || [],
-      createdAt: existingUserReview ? existingUserReview.createdAt : Date.now()
+    // Explicitly sanitize every field to guarantee valid Firestore data types
+    const sanitizedReview: GameReview = {
+      id: String(reviewId),
+      gameId: String(gameId),
+      userId: String(user.uid),
+      userName: String(authorName || 'Nexus Operative'),
+      userAvatar: String(profile?.photoURL || user.photoURL || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(user.uid)}`),
+      comment: String(commentText.trim()),
+      helpfulCount: Number(existingUserReview ? existingUserReview.helpfulCount : 0),
+      likedBy: Array.isArray(existingUserReview?.likedBy) ? existingUserReview.likedBy : [],
+      createdAt: Number(existingUserReview ? existingUserReview.createdAt : Date.now())
     };
 
     // Update local state: Replace any existing review from this user so only 1 exists
     setReviews(prev => [
-      newReview, 
+      sanitizedReview, 
       ...prev.filter(r => r.id !== reviewId && r.userId !== user.uid)
     ]);
 
@@ -197,16 +260,17 @@ export const GameReviews: React.FC<GameReviewsProps> = ({ gameId, gameTitle }) =
     try {
       const currentSaved: GameReview[] = JSON.parse(localStorage.getItem(localKey) || '[]');
       const filtered = currentSaved.filter(r => r.id !== reviewId && r.userId !== user.uid && !r.id.startsWith('seed_'));
-      localStorage.setItem(localKey, JSON.stringify([newReview, ...filtered]));
+      localStorage.setItem(localKey, JSON.stringify([sanitizedReview, ...filtered]));
     } catch (e) {}
 
-    // Synchronize to Firestore
+    // Synchronize to Firestore cloud collection
     try {
       if (db) {
-        await setDoc(doc(db, 'game_reviews', reviewId), newReview);
+        await setDoc(doc(db, 'game_reviews', reviewId), sanitizedReview, { merge: true });
+        console.log('[GameReviews] Successfully synchronized review to Firestore:', reviewId);
       }
     } catch (err) {
-      console.warn('Review persisted locally. Remote sync notice:', err);
+      console.error('[GameReviews] Firestore write failed:', err);
     }
 
     // Award +25 XP only for new reviews
