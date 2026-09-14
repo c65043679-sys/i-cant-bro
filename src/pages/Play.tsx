@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useMemo } from 'react';
+import React, { useRef, useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ChevronLeft, Info, Gamepad2, Maximize2, Minimize2, Save, CheckCircle2, Heart, Zap, Moon, ZoomIn, Crown, ShieldAlert, Clock } from 'lucide-react';
 import { getAllGames } from '../utils/getAllGames';
@@ -53,7 +53,29 @@ export const Play: React.FC = () => {
   const [containerWidth, setContainerWidth] = useState<number>(0);
   const [containerHeight, setContainerHeight] = useState<number>(0);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [isNearFullscreen, setIsNearFullscreen] = useState<boolean>(false);
+  const fsProximityRef = useRef<HTMLDivElement>(null);
+  const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
   const recordedGameIdRef = useRef<string | null>(null);
+
+  const hideFullscreenControls = useCallback(() => {
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+      inactivityTimerRef.current = null;
+    }
+    setIsNearFullscreen(false);
+  }, []);
+
+  const showFullscreenControls = useCallback(() => {
+    setIsNearFullscreen(true);
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+    }
+    // Auto-hide after 2.5 seconds of inactivity
+    inactivityTimerRef.current = setTimeout(() => {
+      setIsNearFullscreen(false);
+    }, 2500);
+  }, []);
 
   // Record game play and initial achievements ONCE per unique game id
   useEffect(() => {
@@ -99,6 +121,32 @@ export const Play: React.FC = () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
     };
   }, []);
+
+  // Proximity detection: only show the fullscreen controls when the mouse cursor is close to them
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!fsProximityRef.current) return;
+      const rect = fsProximityRef.current.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const distance = Math.hypot(e.clientX - centerX, e.clientY - centerY);
+
+      // If mouse is within 100px of the button controls area, show it; otherwise immediately auto-hide
+      if (distance <= 100) {
+        showFullscreenControls();
+      } else {
+        hideFullscreenControls();
+      }
+    };
+
+    window.addEventListener('mousemove', handleMouseMove, { passive: true });
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+      }
+    };
+  }, [showFullscreenControls, hideFullscreenControls]);
 
   useEffect(() => {
     const handleGameKeyDown = (e: KeyboardEvent) => {
@@ -493,52 +541,77 @@ export const Play: React.FC = () => {
               );
             })()}
             
-            {/* Player Container Overlay Controls (Works in both windowed and fullscreen modes) */}
+            {/* Player Container Overlay Controls - Auto-hides when moving mouse away */}
             <div 
-              className="absolute top-4 right-4 z-50 flex items-center gap-2.5 opacity-0 group-hover/player:opacity-100 transition-all duration-300 pointer-events-auto"
+              ref={fsProximityRef}
+              className="absolute top-0 right-0 z-50 p-3 sm:p-4 flex items-start justify-end pointer-events-auto"
               onMouseEnter={() => {
+                showFullscreenControls();
                 try { window.focus(); } catch (e) {}
               }}
               onMouseMove={() => {
+                showFullscreenControls();
                 if (document.activeElement?.tagName?.toLowerCase() === 'iframe') {
                   try { window.focus(); } catch (e) {}
                 }
               }}
+              onMouseLeave={() => {
+                hideFullscreenControls();
+              }}
             >
-              {isFullscreen && (
-                <button
-                  onClick={() => {
-                    if (document.fullscreenElement) {
-                      try { document.exitFullscreen().catch(() => {}); } catch (e) {}
-                    }
-                    triggerPanic();
-                  }}
-                  className="px-3.5 py-2 rounded-full bg-slate-900/90 hover:bg-red-950/90 border border-white/10 hover:border-red-500/40 text-slate-200 hover:text-red-200 text-xs font-medium backdrop-blur-xl shadow-2xl transition-all duration-200 flex items-center gap-2 cursor-pointer active:scale-95 group/panic"
-                  title="Emergency Panic Redirect"
-                >
-                  <ShieldAlert className="w-3.5 h-3.5 text-red-400 group-hover/panic:text-red-300 transition-colors" />
-                  <span>Panic Redirect</span>
-                  <span className="px-1.5 py-0.5 rounded bg-white/10 text-[10px] font-mono text-slate-400 group-hover/panic:text-red-200 font-bold uppercase">
-                    {(() => {
-                      switch (settings.panicKey) {
-                        case 'Backquote': return '`';
-                        case 'Escape': return 'Esc';
-                        case 'AltP': return 'Alt+P';
-                        case 'AltZ': return 'Alt+Z';
-                        default: return 'Alt+P';
-                      }
-                    })()}
-                  </span>
-                </button>
-              )}
+              {/* Invisible proximity hover buffer expanding ~100px from top-right corner over iframe */}
+              <div 
+                className="absolute top-0 right-0 w-28 h-24 pointer-events-auto"
+                onMouseEnter={showFullscreenControls}
+                onMouseMove={showFullscreenControls}
+                onMouseLeave={hideFullscreenControls}
+              />
 
-              <button 
-                onClick={toggleFullscreen}
-                className="p-2 rounded-full bg-slate-900/90 hover:bg-slate-800 border border-white/10 text-slate-300 hover:text-white text-xs font-medium backdrop-blur-xl shadow-2xl transition-all duration-200 flex items-center justify-center cursor-pointer active:scale-95"
-                title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+              <div 
+                className={`relative flex items-center gap-2.5 transition-all duration-200 ease-out ${
+                  isNearFullscreen 
+                    ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto' 
+                    : 'opacity-0 -translate-y-1.5 scale-90 pointer-events-none'
+                }`}
+                onMouseEnter={showFullscreenControls}
+                onMouseMove={showFullscreenControls}
+                onMouseLeave={hideFullscreenControls}
               >
-                {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-              </button>
+                {isFullscreen && (
+                  <button
+                    onClick={() => {
+                      if (document.fullscreenElement) {
+                        try { document.exitFullscreen().catch(() => {}); } catch (e) {}
+                      }
+                      triggerPanic();
+                    }}
+                    className="px-3.5 py-2 rounded-full bg-slate-900/90 hover:bg-red-950/90 border border-white/10 hover:border-red-500/40 text-slate-200 hover:text-red-200 text-xs font-medium backdrop-blur-xl shadow-2xl transition-all duration-200 flex items-center gap-2 cursor-pointer active:scale-95 group/panic"
+                    title="Emergency Panic Redirect"
+                  >
+                    <ShieldAlert className="w-3.5 h-3.5 text-red-400 group-hover/panic:text-red-300 transition-colors" />
+                    <span>Panic Redirect</span>
+                    <span className="px-1.5 py-0.5 rounded bg-white/10 text-[10px] font-mono text-slate-400 group-hover/panic:text-red-200 font-bold uppercase">
+                      {(() => {
+                        switch (settings.panicKey) {
+                          case 'Backquote': return '`';
+                          case 'Escape': return 'Esc';
+                          case 'AltP': return 'Alt+P';
+                          case 'AltZ': return 'Alt+Z';
+                          default: return 'Alt+P';
+                        }
+                      })()}
+                    </span>
+                  </button>
+                )}
+
+                <button 
+                  onClick={toggleFullscreen}
+                  className="p-2.5 rounded-full bg-slate-900/90 hover:bg-slate-800 border border-white/10 text-slate-300 hover:text-white text-xs font-medium backdrop-blur-xl shadow-2xl transition-all duration-200 flex items-center justify-center cursor-pointer active:scale-95"
+                  title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+                >
+                  {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
           </div>
 
