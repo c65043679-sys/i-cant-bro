@@ -7,6 +7,7 @@ import {
   Check, 
   Trash2, 
   Plus,
+  Pencil,
   X,
   LogIn,
   Lock
@@ -53,6 +54,12 @@ export const GameReviews: React.FC<GameReviewsProps> = ({ gameId, gameTitle }) =
   const authorDisplayName = useMemo(() => {
     return profile?.displayName || user?.displayName || 'Nexus Operative';
   }, [profile, user]);
+
+  // Check if current authenticated user already has a review for this game (1 review per game limit)
+  const existingUserReview = useMemo(() => {
+    if (!user) return null;
+    return reviews.find(r => r.userId === user.uid) || null;
+  }, [reviews, user]);
 
   // Upvoted reviews tracking in localStorage
   const [likedReviews, setLikedReviews] = useState<string[]>(() => {
@@ -135,7 +142,22 @@ export const GameReviews: React.FC<GameReviewsProps> = ({ gameId, gameTitle }) =
     };
   }, [gameId]);
 
-  // Submit Review Handler (Requires authenticated account)
+  // Open Form Handler: pre-populates existing review if user already reviewed this game
+  const handleOpenForm = () => {
+    soundManager.playClick();
+    if (!user) {
+      setIsFormOpen(true);
+      return;
+    }
+    if (existingUserReview) {
+      setCommentText(existingUserReview.comment);
+    } else {
+      setCommentText('');
+    }
+    setIsFormOpen(prev => !prev);
+  };
+
+  // Submit Review Handler (Enforces 1 review per user per game; edits if existing)
   const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) {
@@ -148,8 +170,11 @@ export const GameReviews: React.FC<GameReviewsProps> = ({ gameId, gameTitle }) =
 
     setIsSubmitting(true);
     const authorName = authorDisplayName;
+    const isEditing = !!existingUserReview;
 
-    const reviewId = `rev_${gameId}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    // Use deterministic ID per user per game to enforce 1-review guarantee at database level
+    const reviewId = existingUserReview ? existingUserReview.id : `rev_${gameId}_${user.uid}`;
+    
     const newReview: GameReview = {
       id: reviewId,
       gameId,
@@ -157,16 +182,21 @@ export const GameReviews: React.FC<GameReviewsProps> = ({ gameId, gameTitle }) =
       userName: authorName,
       userAvatar: profile?.photoURL || user.photoURL || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(user.uid)}`,
       comment: commentText.trim(),
-      helpfulCount: 0,
-      createdAt: Date.now()
+      helpfulCount: existingUserReview ? existingUserReview.helpfulCount : 0,
+      likedBy: existingUserReview?.likedBy || [],
+      createdAt: existingUserReview ? existingUserReview.createdAt : Date.now()
     };
 
-    // Update local state immediately
-    setReviews(prev => [newReview, ...prev.filter(r => r.id !== reviewId)]);
+    // Update local state: Replace any existing review from this user so only 1 exists
+    setReviews(prev => [
+      newReview, 
+      ...prev.filter(r => r.id !== reviewId && r.userId !== user.uid)
+    ]);
+
     const localKey = `nexus_reviews_${gameId}`;
     try {
       const currentSaved: GameReview[] = JSON.parse(localStorage.getItem(localKey) || '[]');
-      const filtered = currentSaved.filter(r => r.id !== reviewId && !r.id.startsWith('seed_'));
+      const filtered = currentSaved.filter(r => r.id !== reviewId && r.userId !== user.uid && !r.id.startsWith('seed_'));
       localStorage.setItem(localKey, JSON.stringify([newReview, ...filtered]));
     } catch (e) {}
 
@@ -179,10 +209,12 @@ export const GameReviews: React.FC<GameReviewsProps> = ({ gameId, gameTitle }) =
       console.warn('Review persisted locally. Remote sync notice:', err);
     }
 
-    // Award +25 XP
-    try {
-      addGameTimePoints(25);
-    } catch (e) {}
+    // Award +25 XP only for new reviews
+    if (!isEditing) {
+      try {
+        addGameTimePoints(25);
+      } catch (e) {}
+    }
 
     // Audio & Confetti
     try {
@@ -196,7 +228,6 @@ export const GameReviews: React.FC<GameReviewsProps> = ({ gameId, gameTitle }) =
 
     setIsSubmitting(false);
     setSubmittedSuccess(true);
-    setCommentText('');
     setTimeout(() => {
       setSubmittedSuccess(false);
       setIsFormOpen(false);
@@ -244,6 +275,9 @@ export const GameReviews: React.FC<GameReviewsProps> = ({ gameId, gameTitle }) =
 
     soundManager.playClick();
     setReviews(prev => prev.filter(r => r.id !== reviewId));
+    if (existingUserReview?.id === reviewId) {
+      setCommentText('');
+    }
 
     const localKey = `nexus_reviews_${gameId}`;
     try {
@@ -293,13 +327,10 @@ export const GameReviews: React.FC<GameReviewsProps> = ({ gameId, gameTitle }) =
           </div>
         </div>
 
-        {/* Header Button: Shown when reviews exist or when form/auth callout is open */}
+        {/* Header Button: Adapts whether user has already posted their 1 review or not */}
         {(reviews.length > 0 || isFormOpen) && (
           <button
-            onClick={() => {
-              soundManager.playClick();
-              setIsFormOpen(prev => !prev);
-            }}
+            onClick={handleOpenForm}
             className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--accent)] hover:brightness-110 text-black font-bold text-xs uppercase tracking-wider transition-all shadow-lg active:scale-95 cursor-pointer shrink-0"
           >
             {isFormOpen ? (
@@ -308,6 +339,11 @@ export const GameReviews: React.FC<GameReviewsProps> = ({ gameId, gameTitle }) =
               <>
                 <LogIn className="w-4 h-4 stroke-[2.5]" />
                 <span>Sign In to Review</span>
+              </>
+            ) : existingUserReview ? (
+              <>
+                <Pencil className="w-3.5 h-3.5" />
+                <span>Edit Your Review</span>
               </>
             ) : (
               <>
@@ -336,20 +372,18 @@ export const GameReviews: React.FC<GameReviewsProps> = ({ gameId, gameTitle }) =
           </div>
           <div>
             <button
-              onClick={async () => {
-                soundManager.playClick();
-                if (!user) {
-                  await signIn();
-                  return;
-                }
-                setIsFormOpen(true);
-              }}
+              onClick={handleOpenForm}
               className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[var(--accent)] hover:brightness-110 text-black font-bold text-xs uppercase tracking-wider transition-all shadow-lg active:scale-95 cursor-pointer"
             >
               {!user ? (
                 <>
                   <LogIn className="w-4 h-4 stroke-[2.5]" />
                   <span>Sign In to Leave a Review</span>
+                </>
+              ) : existingUserReview ? (
+                <>
+                  <Pencil className="w-3.5 h-3.5" />
+                  <span>Edit Your Review</span>
                 </>
               ) : (
                 <>
@@ -400,7 +434,7 @@ export const GameReviews: React.FC<GameReviewsProps> = ({ gameId, gameTitle }) =
         </div>
       )}
 
-      {/* Review Submission Form: Only available when user has an account */}
+      {/* Review Submission / Editing Form: Only available when user has an account */}
       {isFormOpen && user && (
         <form 
           onSubmit={handleSubmitReview}
@@ -408,13 +442,25 @@ export const GameReviews: React.FC<GameReviewsProps> = ({ gameId, gameTitle }) =
         >
           <div className="flex items-center justify-between border-b border-white/10 pb-4">
             <div className="flex items-center gap-2 text-white">
-              <Sparkles className="w-5 h-5 text-[var(--accent)]" />
-              <h3 className="font-bold text-base">Write a Review</h3>
+              {existingUserReview ? (
+                <Pencil className="w-4 h-4 text-[var(--accent)]" />
+              ) : (
+                <Sparkles className="w-5 h-5 text-[var(--accent)]" />
+              )}
+              <h3 className="font-bold text-base">
+                {existingUserReview ? 'Edit Your Review' : 'Write a Review'}
+              </h3>
             </div>
             <div className="flex items-center gap-3">
-              <span className="px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-bold uppercase tracking-wider">
-                +25 Operative Points
-              </span>
+              {existingUserReview ? (
+                <span className="px-2.5 py-1 rounded-full bg-[var(--accent)]/10 border border-[var(--accent)]/20 text-[var(--accent)] text-[10px] font-bold uppercase tracking-wider">
+                  1 Review Per Game • Updating
+                </span>
+              ) : (
+                <span className="px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-bold uppercase tracking-wider">
+                  +25 Operative Points
+                </span>
+              )}
               <button
                 type="button"
                 onClick={() => {
@@ -471,14 +517,14 @@ export const GameReviews: React.FC<GameReviewsProps> = ({ gameId, gameTitle }) =
                 {submittedSuccess ? (
                   <>
                     <Check className="w-4 h-4 stroke-[3] text-black" />
-                    <span>Posted!</span>
+                    <span>{existingUserReview ? 'Updated!' : 'Posted!'}</span>
                   </>
                 ) : isSubmitting ? (
-                  <span>Posting...</span>
+                  <span>{existingUserReview ? 'Updating...' : 'Posting...'}</span>
                 ) : (
                   <>
                     <Send className="w-4 h-4" />
-                    <span>Post Review (+25 XP)</span>
+                    <span>{existingUserReview ? 'Update Review' : 'Post Review (+25 XP)'}</span>
                   </>
                 )}
               </button>
@@ -513,7 +559,9 @@ export const GameReviews: React.FC<GameReviewsProps> = ({ gameId, gameTitle }) =
             return (
               <div 
                 key={review.id}
-                className="bg-white/5 border border-white/10 hover:border-white/20 p-5 rounded-2xl backdrop-blur-sm transition-all space-y-3"
+                className={`bg-white/5 border p-5 rounded-2xl backdrop-blur-sm transition-all space-y-3 ${
+                  isAuthor ? 'border-[var(--accent)]/30 bg-[var(--accent)]/[0.02]' : 'border-white/10 hover:border-white/20'
+                }`}
               >
                 {/* Author row */}
                 <div className="flex items-start justify-between gap-3">
@@ -530,7 +578,7 @@ export const GameReviews: React.FC<GameReviewsProps> = ({ gameId, gameTitle }) =
                         </span>
                         {isAuthor && (
                           <span className="px-1.5 py-0.5 rounded bg-[var(--accent)]/20 border border-[var(--accent)]/30 text-[var(--accent)] text-[10px] font-bold uppercase">
-                            You
+                            Your Review
                           </span>
                         )}
                       </div>
@@ -540,15 +588,29 @@ export const GameReviews: React.FC<GameReviewsProps> = ({ gameId, gameTitle }) =
                     </div>
                   </div>
 
-                  {canDelete && (
-                    <button
-                      onClick={() => handleDeleteReview(review.id)}
-                      className="text-slate-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
-                      title="Delete review"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
+                  <div className="flex items-center gap-1">
+                    {/* Author can edit their single review */}
+                    {isAuthor && (
+                      <button
+                        onClick={handleOpenForm}
+                        className="text-slate-400 hover:text-[var(--accent)] p-1.5 rounded-lg hover:bg-white/5 transition-colors cursor-pointer flex items-center gap-1 text-xs"
+                        title="Edit your review"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                        <span className="text-[11px]">Edit</span>
+                      </button>
+                    )}
+
+                    {canDelete && (
+                      <button
+                        onClick={() => handleDeleteReview(review.id)}
+                        className="text-slate-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
+                        title="Delete review"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Review Message Text */}
@@ -594,7 +656,7 @@ function formatTimeAgo(timestamp: number): string {
   if (minutes < 60) return `${minutes}m ago`;
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
+  const days = Math.floor(minutes / 24);
   if (days < 30) return `${days}d ago`;
   return new Date(timestamp).toLocaleDateString();
 }
