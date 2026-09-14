@@ -72,7 +72,7 @@ export const GameReviews: React.FC<GameReviewsProps> = ({ gameId, gameTitle }) =
     }
   });
 
-  // Load reviews from Firestore & local storage (pure user reviews only, filter out any old bot/seed data)
+  // Load reviews from Backend Server API, Live Stream (SSE), Firestore & local storage
   useEffect(() => {
     setLoading(true);
     const localKey = `nexus_reviews_${gameId}`;
@@ -84,76 +84,96 @@ export const GameReviews: React.FC<GameReviewsProps> = ({ gameId, gameTitle }) =
         const parsed: GameReview[] = JSON.parse(saved);
         // Exclude any legacy seed/bot reviews
         cachedReviews = parsed.filter(r => !r.id.startsWith('seed_') && !r.userId?.startsWith('seed-'));
-        localStorage.setItem(localKey, JSON.stringify(cachedReviews));
       }
     } catch (e) {
       console.warn('Error reading cached reviews:', e);
     }
 
-    setReviews(cachedReviews);
+    if (cachedReviews.length > 0) {
+      setReviews(cachedReviews);
+    }
 
-    // Auto-sync any locally cached review belonging to the logged-in user to Firestore cloud if not already synced
-    if (db && user) {
+    // Helper to merge incoming reviews into state without duplicates
+    const mergeReviews = (incomingList: GameReview[]) => {
+      setReviews(prev => {
+        const map = new Map<string, GameReview>();
+        prev.forEach(r => map.set(r.id, r));
+        incomingList.forEach(r => {
+          if (!r.id.startsWith('seed_') && !r.userId?.startsWith('seed-')) {
+            map.set(r.id, r);
+          }
+        });
+        const merged = Array.from(map.values());
+        try {
+          localStorage.setItem(localKey, JSON.stringify(merged));
+        } catch (e) {}
+        return merged;
+      });
+      setLoading(false);
+    };
+
+    // 1. Fetch from authoritative Server API (works across all browsers, school networks & proxies)
+    fetch(`/api/reviews?gameId=${encodeURIComponent(gameId)}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data && Array.isArray(data.reviews)) {
+          mergeReviews(data.reviews);
+        }
+      })
+      .catch(err => {
+        console.warn('[GameReviews] Server fetch notice:', err);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+
+    // 2. Connect to Server-Sent Events (SSE) for instantaneous cross-user review sync
+    let eventSource: EventSource | null = null;
+    try {
+      eventSource = new EventSource('/api/live-stream');
+      eventSource.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          if (payload.type === 'review' && payload.data) {
+            const { action, review, reviewId, helpfulCount, gameId: eventGameId } = payload.data;
+            if (eventGameId === gameId || review?.gameId === gameId) {
+              if (action === 'upsert' && review) {
+                mergeReviews([review]);
+              } else if (action === 'helpful' && reviewId) {
+                setReviews(prev => prev.map(r => r.id === reviewId ? { ...r, helpfulCount: Number(helpfulCount) || r.helpfulCount } : r));
+              } else if (action === 'delete' && reviewId) {
+                setReviews(prev => prev.filter(r => r.id !== reviewId));
+              }
+            }
+          } else if (payload.type === 'init' && Array.isArray(payload.reviews)) {
+            const matching = payload.reviews.filter((r: any) => r.gameId === gameId);
+            if (matching.length > 0) {
+              mergeReviews(matching);
+            }
+          }
+        } catch (e) {}
+      };
+    } catch (e) {
+      console.warn('[GameReviews] SSE connection notice:', e);
+    }
+
+    // 3. Auto-sync any locally cached review belonging to the logged-in user to Server API & Firestore
+    if (cachedReviews.length > 0 && user) {
       const myLocal = cachedReviews.find(r => r.userId === user.uid);
       if (myLocal) {
-        const syncPayload = {
-          id: myLocal.id,
-          gameId: myLocal.gameId || gameId,
-          userId: myLocal.userId,
-          userName: myLocal.userName || authorDisplayName,
-          userAvatar: myLocal.userAvatar || profile?.photoURL || user.photoURL || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(user.uid)}`,
-          comment: myLocal.comment || '',
-          helpfulCount: Number(myLocal.helpfulCount) || 0,
-          likedBy: Array.isArray(myLocal.likedBy) ? myLocal.likedBy : [],
-          createdAt: Number(myLocal.createdAt) || Date.now()
-        };
-        setDoc(doc(db, 'game_reviews', myLocal.id), syncPayload, { merge: true })
-          .then(() => console.log('[GameReviews] Auto-synced previous review to Firestore cloud:', myLocal.id))
-          .catch(e => console.warn('[GameReviews] Auto-sync notice:', e));
+        fetch('/api/reviews', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(myLocal)
+        }).catch(() => {});
+
+        if (db) {
+          setDoc(doc(db, 'game_reviews', myLocal.id), myLocal, { merge: true }).catch(() => {});
+        }
       }
     }
 
-    // Direct Firestore fetch via getDocs for instant availability across devices
-    if (db) {
-      const reviewsRef = collection(db, 'game_reviews');
-      const q = query(reviewsRef, where('gameId', '==', gameId));
-      getDocs(q).then((snapshot) => {
-        if (!snapshot.empty) {
-          const directReviews: GameReview[] = [];
-          snapshot.forEach((docSnap) => {
-            const data = docSnap.data();
-            if (docSnap.id.startsWith('seed_') || data.userId?.startsWith('seed-')) return;
-            directReviews.push({
-              id: docSnap.id,
-              gameId: data.gameId || gameId,
-              userId: data.userId || 'anon',
-              userName: data.userName || 'Nexus Operative',
-              userAvatar: data.userAvatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(data.userId || 'user')}`,
-              comment: data.comment || '',
-              helpfulCount: Number(data.helpfulCount) || 0,
-              likedBy: Array.isArray(data.likedBy) ? data.likedBy : [],
-              createdAt: Number(data.createdAt) || Date.now()
-            });
-          });
-
-          setReviews(prev => {
-            const map = new Map<string, GameReview>();
-            directReviews.forEach(r => map.set(r.id, r));
-            prev.forEach(r => { if (!map.has(r.id)) map.set(r.id, r); });
-            const merged = Array.from(map.values());
-            try {
-              localStorage.setItem(localKey, JSON.stringify(merged));
-            } catch (e) {}
-            return merged;
-          });
-          setLoading(false);
-        }
-      }).catch(err => {
-        console.warn('[GameReviews] Direct fetch getDocs notice:', err);
-      });
-    }
-
-    // Subscribe to live Firestore collection for real-time updates across screens
+    // 4. Firestore listener (dual sync layer)
     let unsubscribe: (() => void) | null = null;
     try {
       if (db) {
@@ -164,10 +184,7 @@ export const GameReviews: React.FC<GameReviewsProps> = ({ gameId, gameTitle }) =
           const remoteReviews: GameReview[] = [];
           snapshot.forEach((docSnap) => {
             const data = docSnap.data();
-            // Strictly exclude any seed/bot entries
-            if (docSnap.id.startsWith('seed_') || data.userId?.startsWith('seed-')) {
-              return;
-            }
+            if (docSnap.id.startsWith('seed_') || data.userId?.startsWith('seed-')) return;
             remoteReviews.push({
               id: docSnap.id,
               gameId: data.gameId || gameId,
@@ -181,26 +198,20 @@ export const GameReviews: React.FC<GameReviewsProps> = ({ gameId, gameTitle }) =
             });
           });
 
-          setReviews(remoteReviews);
-          setLoading(false);
-
-          try {
-            localStorage.setItem(localKey, JSON.stringify(remoteReviews));
-          } catch (e) {}
+          if (remoteReviews.length > 0) {
+            mergeReviews(remoteReviews);
+          }
         }, (err) => {
-          console.error('[GameReviews] Firestore game_reviews listener error:', err);
-          setLoading(false);
+          console.warn('[GameReviews] Firestore listener notice:', err);
         });
-      } else {
-        setLoading(false);
       }
     } catch (err) {
       console.warn('Failed to subscribe to firestore game_reviews:', err);
-      setLoading(false);
     }
 
     return () => {
       if (unsubscribe) unsubscribe();
+      if (eventSource) eventSource.close();
     };
   }, [gameId, user?.uid]);
 
@@ -263,14 +274,25 @@ export const GameReviews: React.FC<GameReviewsProps> = ({ gameId, gameTitle }) =
       localStorage.setItem(localKey, JSON.stringify([sanitizedReview, ...filtered]));
     } catch (e) {}
 
-    // Synchronize to Firestore cloud collection
+    // 1. Post to Server API (100% reliable across all devices, domains, and school networks)
+    fetch('/api/reviews', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(sanitizedReview)
+    }).then(res => {
+      if (res.ok) console.log('[GameReviews] Successfully synced review to server API');
+    }).catch(err => {
+      console.warn('[GameReviews] Server API post notice:', err);
+    });
+
+    // 2. Synchronize to Firestore cloud collection (secondary cloud backup)
     try {
       if (db) {
         await setDoc(doc(db, 'game_reviews', reviewId), sanitizedReview, { merge: true });
         console.log('[GameReviews] Successfully synchronized review to Firestore:', reviewId);
       }
     } catch (err) {
-      console.error('[GameReviews] Firestore write failed:', err);
+      console.warn('[GameReviews] Firestore write notice:', err);
     }
 
     // Award +25 XP only for new reviews
@@ -309,23 +331,32 @@ export const GameReviews: React.FC<GameReviewsProps> = ({ gameId, gameTitle }) =
     localStorage.setItem('nexus_liked_reviews', JSON.stringify(nextLiked));
     soundManager.playClick();
 
+    const delta = isAlreadyLiked ? -1 : 1;
+
     // Optimistic UI update
     setReviews(prev => prev.map(r => {
       if (r.id === reviewId) {
         return {
           ...r,
-          helpfulCount: Math.max(0, r.helpfulCount + (isAlreadyLiked ? -1 : 1))
+          helpfulCount: Math.max(0, r.helpfulCount + delta)
         };
       }
       return r;
     }));
+
+    // Update in Server API
+    fetch(`/api/reviews/${encodeURIComponent(reviewId)}/helpful`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ delta })
+    }).catch(() => {});
 
     // Update in Firestore
     try {
       if (db) {
         const reviewRef = doc(db, 'game_reviews', reviewId);
         await updateDoc(reviewRef, {
-          helpfulCount: increment(isAlreadyLiked ? -1 : 1)
+          helpfulCount: increment(delta)
         });
       }
     } catch (err) {
@@ -349,6 +380,12 @@ export const GameReviews: React.FC<GameReviewsProps> = ({ gameId, gameTitle }) =
       localStorage.setItem(localKey, JSON.stringify(currentSaved.filter(r => r.id !== reviewId)));
     } catch (e) {}
 
+    // Delete in Server API
+    fetch(`/api/reviews/${encodeURIComponent(reviewId)}`, {
+      method: 'DELETE'
+    }).catch(() => {});
+
+    // Delete in Firestore
     try {
       if (db) {
         await deleteDoc(doc(db, 'game_reviews', reviewId));

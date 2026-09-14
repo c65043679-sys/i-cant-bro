@@ -66,6 +66,7 @@ async function startServer() {
   const BROADCAST_FILE = path.join(process.cwd(), "data", "broadcast.json");
   const PARTY_FILE = path.join(process.cwd(), "data", "party.json");
   const EFFECTS_FILE = path.join(process.cwd(), "data", "effects.json");
+  const REVIEWS_FILE = path.join(process.cwd(), "data", "reviews.json");
 
   function readJsonFile<T>(filePath: string, fallback: T): T {
     try {
@@ -129,9 +130,10 @@ async function startServer() {
     const broadcast = readJsonFile(BROADCAST_FILE, { message: "", updatedAt: "", updatedBy: "" });
     const party = readJsonFile(PARTY_FILE, { mode: "", timestamp: 0, triggeredBy: "" });
     const effects = readJsonFile(EFFECTS_FILE, { godModeAura: false, matrixRain: false });
+    const reviews = readJsonFile(REVIEWS_FILE, []);
 
     // Send initial state snapshot to newly connected client
-    res.write(`data: ${JSON.stringify({ type: "init", broadcast, party, effects })}\n\n`);
+    res.write(`data: ${JSON.stringify({ type: "init", broadcast, party, effects, reviews })}\n\n`);
 
     sseClients.add(res);
 
@@ -462,6 +464,89 @@ async function startServer() {
 
     writeLeaderboardData(cleaned);
     res.json({ success: true, player: playerRecord, players: cleaned });
+  });
+
+  function readReviewsData(): any[] {
+    return readJsonFile(REVIEWS_FILE, []);
+  }
+
+  function writeReviewsData(data: any[]) {
+    writeJsonFile(REVIEWS_FILE, data);
+  }
+
+  // GET /api/reviews - Get reviews (optionally filtered by gameId)
+  app.get("/api/reviews", (req, res) => {
+    const gameId = typeof req.query.gameId === "string" ? req.query.gameId.trim() : null;
+    const allReviews = readReviewsData();
+    if (gameId) {
+      const filtered = allReviews.filter((r: any) => r.gameId === gameId);
+      return res.json({ reviews: filtered });
+    }
+    res.json({ reviews: allReviews });
+  });
+
+  // POST /api/reviews - Create or update a review (1 review per user per game limit)
+  app.post("/api/reviews", (req, res) => {
+    const body = req.body;
+    if (!body || !body.gameId || !body.userId || !body.comment) {
+      return res.status(400).json({ error: "Missing required fields (gameId, userId, comment)" });
+    }
+
+    const allReviews = readReviewsData();
+    const reviewId = body.id || `rev_${body.gameId}_${body.userId}`;
+    const newReview = {
+      id: String(reviewId),
+      gameId: String(body.gameId),
+      userId: String(body.userId),
+      userName: String(body.userName || "Nexus Operative"),
+      userAvatar: body.userAvatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(body.userId)}`,
+      comment: String(body.comment).slice(0, 500),
+      helpfulCount: Number(body.helpfulCount) || 0,
+      likedBy: Array.isArray(body.likedBy) ? body.likedBy : [],
+      createdAt: Number(body.createdAt) || Date.now()
+    };
+
+    const existingIndex = allReviews.findIndex((r: any) => r.id === reviewId || (r.gameId === body.gameId && r.userId === body.userId));
+    if (existingIndex >= 0) {
+      allReviews[existingIndex] = {
+        ...allReviews[existingIndex],
+        ...newReview,
+        createdAt: allReviews[existingIndex].createdAt || newReview.createdAt
+      };
+    } else {
+      allReviews.unshift(newReview);
+    }
+
+    writeReviewsData(allReviews);
+    sendSseEvent("review", { action: "upsert", review: newReview, gameId: newReview.gameId });
+    res.json({ success: true, review: newReview, reviews: allReviews.filter((r: any) => r.gameId === body.gameId) });
+  });
+
+  // POST /api/reviews/:id/helpful - Toggle or adjust helpful count
+  app.post("/api/reviews/:id/helpful", (req, res) => {
+    const { id } = req.params;
+    const { delta } = req.body || {};
+    const d = typeof delta === "number" ? delta : 1;
+    const allReviews = readReviewsData();
+    const target = allReviews.find((r: any) => r.id === id);
+    if (target) {
+      target.helpfulCount = Math.max(0, (target.helpfulCount || 0) + d);
+      writeReviewsData(allReviews);
+      sendSseEvent("review", { action: "helpful", reviewId: id, helpfulCount: target.helpfulCount, gameId: target.gameId });
+      return res.json({ success: true, review: target });
+    }
+    res.status(404).json({ error: "Review not found" });
+  });
+
+  // DELETE /api/reviews/:id - Delete a review
+  app.delete("/api/reviews/:id", (req, res) => {
+    const { id } = req.params;
+    const allReviews = readReviewsData();
+    const target = allReviews.find((r: any) => r.id === id);
+    const filtered = allReviews.filter((r: any) => r.id !== id);
+    writeReviewsData(filtered);
+    sendSseEvent("review", { action: "delete", reviewId: id, gameId: target?.gameId });
+    res.json({ success: true, id });
   });
 
   // Sitemap.xml with dynamic hostname substitution to support dev, share, and custom domains seamlessly
