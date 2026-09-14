@@ -1,5 +1,5 @@
 import React from 'react';
-import { Star as StarIcon, Heart } from 'lucide-react';
+import { Heart } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { Game } from '../types';
@@ -74,7 +74,9 @@ export const GameCard: React.FC<GameCardProps> = ({ game }) => {
           <h3 className="text-sm font-bold truncate text-slate-100 group-hover:text-[var(--accent)] transition-colors">
             {game.title}
           </h3>
-          <p className="text-[10px] text-slate-500 uppercase tracking-tighter mt-1">{game.category}</p>
+          <div className="flex items-center justify-between mt-1">
+            <p className="text-[10px] text-slate-500 uppercase tracking-tighter">{game.category}</p>
+          </div>
         </div>
       </Link>
     </motion.div>

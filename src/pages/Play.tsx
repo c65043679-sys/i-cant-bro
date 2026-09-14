@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ChevronLeft, Info, Gamepad2, Maximize2, Minimize2, Save, CheckCircle2, Heart, Zap, Moon, ZoomIn, Crown, ShieldAlert, Clock } from 'lucide-react';
+import { ChevronLeft, Info, Gamepad2, Maximize2, Minimize2, Save, CheckCircle2, Heart, Zap, Moon, ZoomIn, Crown, ShieldAlert, Clock, Star, MessageSquare } from 'lucide-react';
 import { getAllGames } from '../utils/getAllGames';
 import { useAuth } from '../components/AuthContext';
 import { useSettings } from '../components/SettingsContext';
@@ -9,6 +9,7 @@ import { usePlayTimeTracker } from '../hooks/usePlayTimeTracker';
 import { db } from '../lib/firebase';
 import { doc, setDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
 import { GameCard } from '../components/GameCard';
+import { GameReviews } from '../components/GameReviews';
 
 export const Play: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -619,15 +620,29 @@ export const Play: React.FC = () => {
             <div className="md:col-span-2 space-y-6">
               <div className="space-y-2">
                 <h1 className="text-4xl sm:text-5xl font-black tracking-tight text-white">{game.title}</h1>
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center flex-wrap">
                    <span className="text-xs font-bold text-[var(--accent)] uppercase tracking-wider">{game.category}</span>
                    <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">•</span>
                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Verified Nexus Content</span>
+                   <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">•</span>
+                   <a 
+                     href="#community-reviews-section" 
+                     className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-[var(--accent)] transition-colors"
+                   >
+                     <MessageSquare className="w-3.5 h-3.5 text-[var(--accent)]" />
+                     <span>Player Reviews</span>
+                   </a>
                 </div>
               </div>
-                <p className="text-slate-400 leading-relaxed text-lg font-medium">
+              <p className="text-slate-400 leading-relaxed text-lg font-medium">
                 {game.description}
               </p>
+
+              {/* Community Player Reviews & Star Ratings */}
+              <GameReviews 
+                gameId={game.id}
+                gameTitle={game.title}
+              />
             </div>
             
             <div className="space-y-6">
