@@ -149,9 +149,10 @@ export const Navbar: React.FC<NavbarProps> = ({ onSearch, searchQuery = '' }) =>
 
   const handleSelectSearch = (term: string) => {
     const trimmed = term.trim();
-    if (!trimmed) return;
-    const updated = saveRecentSearch(trimmed);
-    setRecentSearches(updated);
+    const updated = trimmed ? saveRecentSearch(trimmed) : recentSearches;
+    if (trimmed) {
+      setRecentSearches(updated);
+    }
     setInputValue(trimmed);
     onSearch(trimmed);
     if (trimmed.length >= 2) {
@@ -243,26 +244,21 @@ export const Navbar: React.FC<NavbarProps> = ({ onSearch, searchQuery = '' }) =>
           <input
             ref={inputRef}
             type="text"
-            placeholder="Search games..."
+            placeholder="Search games (press Enter)..."
             value={inputValue}
             onFocus={() => setIsDropdownOpen(true)}
             onChange={(e) => {
               const val = e.target.value;
               setInputValue(val);
-              onSearch(val);
-              if (val.trim().length >= 2) {
-                try { unlockAchievement('search_master'); } catch (err) {}
-              }
-              if (location.pathname !== '/') {
-                navigate('/');
+              // If user completely cleared the input box, reset active search
+              if (val === '' && searchQuery !== '') {
+                onSearch('');
               }
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault();
-                if (inputValue.trim()) {
-                  handleSelectSearch(inputValue.trim());
-                }
+                handleSelectSearch(inputValue.trim());
               } else if (e.key === 'Escape') {
                 setIsDropdownOpen(false);
                 inputRef.current?.blur();

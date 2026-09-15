@@ -142,8 +142,8 @@ export const Home: React.FC<HomeProps> = ({ searchQuery, activeCategory }) => {
 
   return (
     <div className="flex-1 p-6 sm:p-8 overflow-x-hidden space-y-10">
-      {/* Dedicated Recently Played & Quick Resume Top Bar */}
-      {!searchQuery && (
+      {/* Dedicated Recently Played & Quick Resume Top Bar - Only shown in the "All Games" tab */}
+      {activeCategory === 'all' && !searchQuery && (
         <QuickResumeBar allGames={unblockedGames} />
       )}
 

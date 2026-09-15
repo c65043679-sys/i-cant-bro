@@ -184,7 +184,7 @@ export const GAMES: Game[] = [
     thumbnail: "/images/cookieclicker.jpg",
     color: "#78350f",
     category: "Arcade",
-    iframe: "https://classroom-6x-online.github.io/g4/cookie-clicker/",
+    iframe: "https://hub-pro.github.io/cookie/index.html",
     controls: "Left click to bake cookies.",
     rating: 4.9,
     allow: "autoplay; fullscreen; camera; focus-without-user-activation *; monetization; gamepad; keyboard-map *; xr-spatial-tracking; clipboard-write",

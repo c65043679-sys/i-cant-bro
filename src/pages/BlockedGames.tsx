@@ -14,7 +14,8 @@ interface BlockedGamesProps {
 export const BlockedGames: React.FC<BlockedGamesProps> = ({ searchQuery: globalSearch = '' }) => {
   const { settings } = useSettings();
   const [allGamesList, setAllGamesList] = useState<Game[]>(() => getAllGames());
-  const [localSearch, setLocalSearch] = useState('');
+  const [localInput, setLocalInput] = useState('');
+  const [submittedSearch, setSubmittedSearch] = useState('');
 
   useEffect(() => {
     const handleGamesUpdate = () => {
@@ -28,7 +29,7 @@ export const BlockedGames: React.FC<BlockedGamesProps> = ({ searchQuery: globalS
     return allGamesList.filter((g) => g.isBlocked);
   }, [allGamesList]);
 
-  const activeSearch = localSearch.trim() || globalSearch.trim();
+  const activeSearch = submittedSearch.trim() || globalSearch.trim();
 
   const filteredBlocked = useMemo(() => {
     if (!activeSearch) return blockedGames;
@@ -89,9 +90,21 @@ export const BlockedGames: React.FC<BlockedGamesProps> = ({ searchQuery: globalS
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="Filter blocked missions..."
-                value={localSearch}
-                onChange={(e) => setLocalSearch(e.target.value)}
+                placeholder="Filter blocked missions (press Enter)..."
+                value={localInput}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setLocalInput(val);
+                  if (val === '' && submittedSearch !== '') {
+                    setSubmittedSearch('');
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    setSubmittedSearch(localInput.trim());
+                  }
+                }}
                 className="w-full bg-black/40 border border-white/10 rounded-xl py-1.5 pl-9 pr-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-rose-500/50"
               />
             </div>
