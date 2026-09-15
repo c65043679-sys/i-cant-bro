@@ -21,16 +21,8 @@ export interface Game {
 
 export type Category = 'all' | 'Action' | 'Racing' | 'Arcade' | 'Puzzle' | 'Horror' | 'Sports' | 'Favorites' | 'Blocked' | 'Unblocked';
 
-export interface GameReview {
+export interface RecentlyPlayedItem {
   id: string;
-  gameId: string;
-  userId: string;
-  userName: string;
-  userAvatar?: string;
-  rating?: number;
-  tags?: string[];
-  comment: string;
-  helpfulCount: number;
-  likedBy?: string[];
-  createdAt: number;
+  playedAt: number;
 }
+

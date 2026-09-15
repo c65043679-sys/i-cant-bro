@@ -82,31 +82,9 @@
         "updatedAt": { "type": "string" }
       },
       "required": ["uid", "displayName", "totalScore"]
-    },
-    "GameReview": {
-      "title": "Game Review",
-      "description": "Quick player review, pro-tips, and 1-5 star ratings for a game",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "gameId": { "type": "string" },
-        "userId": { "type": "string" },
-        "userName": { "type": "string" },
-        "userAvatar": { "type": "string" },
-        "rating": { "type": "number", "minimum": 1, "maximum": 5 },
-        "tags": { "type": "array", "items": { "type": "string" } },
-        "comment": { "type": "string", "maxLength": 500 },
-        "helpfulCount": { "type": "number" },
-        "createdAt": { "type": "number" }
-      },
-      "required": ["gameId", "userName", "rating", "comment"]
     }
   },
   "firestore": {
-    "/game_reviews/{reviewId}": {
-      "schema": "GameReview",
-      "description": "Collection of public player ratings and quick reviews for games"
-    },
     "/users/{uid}": {
       "schema": "UserProfile",
       "description": "Collection of user profiles"

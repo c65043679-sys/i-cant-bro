@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Game, Category } from '../types';
 import { GameCard } from '../components/GameCard';
+import { QuickResumeBar } from '../components/QuickResumeBar';
 import { getAllGames } from '../utils/getAllGames';
 import { motion } from 'motion/react';
 import { useAuth } from '../components/AuthContext';
@@ -78,22 +79,6 @@ export const Home: React.FC<HomeProps> = ({ searchQuery, activeCategory }) => {
     return allGamesList.filter((g) => g.isBlocked).length;
   }, [allGamesList]);
 
-  const featuredGames = useMemo(() => unblockedGames.filter(g => g.featured), [unblockedGames]);
-  const [featuredIndex, setFeaturedIndex] = useState(() => 
-    Math.floor(Math.random() * (featuredGames.length || 1))
-  );
-
-  useEffect(() => {
-    if (featuredGames.length <= 1) return;
-    
-    // Rotate every 10 minutes (600,000ms)
-    const interval = setInterval(() => {
-      setFeaturedIndex((prev) => (prev + 1) % featuredGames.length);
-    }, 600000);
-
-    return () => clearInterval(interval);
-  }, [featuredGames.length]);
-
   const filteredGames = useMemo(() => {
     return unblockedGames.filter((game) => {
       const matchesSearch = game.title.toLowerCase().includes(searchQuery.toLowerCase());
@@ -151,56 +136,15 @@ export const Home: React.FC<HomeProps> = ({ searchQuery, activeCategory }) => {
     return list;
   }, [filteredGames, sortOption, allGamesList]);
 
-  const featuredGame = featuredGames[featuredIndex];
-
   const gridClass = settings.compactGrid
     ? "grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3.5"
     : "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6";
 
   return (
     <div className="flex-1 p-6 sm:p-8 overflow-x-hidden space-y-10">
-      {featuredGame && activeCategory === 'all' && !searchQuery && (
-        <section>
-          <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-            <span className="w-1.5 h-6 bg-[var(--accent)] rounded-full"></span>
-            Featured Masterpiece
-          </h2>
-          <motion.div 
-            key={featuredGame.id}
-            initial={{ opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.5 }}
-            className="relative w-full h-[320px] rounded-2xl overflow-hidden group border border-white/10 shadow-2xl"
-            style={{ backgroundColor: featuredGame.color }}
-          >
-            {/* Solid color background banner */}
-            <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/80 to-transparent z-10"></div>
-            
-            <div className="absolute top-1/2 right-10 -translate-y-1/2 text-[180px] leading-none font-black text-white/5 select-none hidden lg:block uppercase tracking-tighter z-10">
-              {featuredGame.title.charAt(0)}
-            </div>
-
-            <div className="absolute inset-0 z-20 p-8 sm:p-10 flex flex-col justify-end">
-              <div className="max-w-xl">
-                <div className="flex items-center gap-3 mb-4">
-                  <span className="px-2 py-0.5 bg-[var(--accent)] text-[10px] font-bold rounded uppercase tracking-wider text-white">Trending</span>
-                  <span className="text-slate-300 text-xs font-semibold">{featuredGame.category}</span>
-                </div>
-                <h1 className="text-4xl sm:text-5xl font-black mb-3 tracking-tight text-white">{featuredGame.title}</h1>
-                <p className="text-slate-300 text-sm sm:text-base mb-6 line-clamp-2 max-w-lg">
-                  {featuredGame.description}
-                </p>
-                <Link 
-                  to={`/play/${featuredGame.id}`}
-                  className="inline-flex px-7 py-3 bg-white text-slate-950 font-bold rounded-xl hover:scale-105 active:scale-95 transition-transform items-center gap-2 shadow-lg"
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="m7 4 12 8-12 8V4z"/></svg>
-                  Play Now
-                </Link>
-              </div>
-            </div>
-          </motion.div>
-        </section>
+      {/* Dedicated Recently Played & Quick Resume Top Bar */}
+      {!searchQuery && (
+        <QuickResumeBar allGames={unblockedGames} />
       )}
 
       {/* Main Game Listings with Sorting Controls */}
