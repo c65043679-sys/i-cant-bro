@@ -17,9 +17,11 @@ export interface Game {
   nativeWidth?: number;
   nativeHeight?: number;
   isBlocked?: boolean;
+  multiplayer?: boolean;
+  players?: string; // e.g. "2 Players", "1-2 Players", "Multiplayer"
 }
 
-export type Category = 'all' | 'Action' | 'Racing' | 'Arcade' | 'Puzzle' | 'Horror' | 'Sports' | 'Favorites' | 'Blocked' | 'Unblocked';
+export type Category = 'all' | 'Multiplayer' | 'Action' | 'Racing' | 'Arcade' | 'Puzzle' | 'Horror' | 'Sports' | 'Favorites' | 'Blocked' | 'Unblocked';
 
 export interface RecentlyPlayedItem {
   id: string;

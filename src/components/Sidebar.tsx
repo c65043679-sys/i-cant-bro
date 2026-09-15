@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutGrid, Flame, Car, Gamepad, Puzzle, User as UserIcon, LogIn, LogOut, Skull, Trophy, Star, Settings, Lock, Unlock, History, PlusCircle, BarChart3, Medal, Package } from 'lucide-react';
+import { LayoutGrid, Flame, Car, Gamepad, Puzzle, User as UserIcon, LogIn, LogOut, Skull, Trophy, Star, Settings, Lock, Unlock, History, PlusCircle, BarChart3, Medal, Package, Users2 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Category } from '../types';
 import { useAuth } from './AuthContext';
@@ -14,6 +14,7 @@ interface SidebarProps {
 const CATEGORIES: { id: Category; name: string; icon: React.ReactNode }[] = [
   { id: 'all', name: 'All Games', icon: <LayoutGrid className="w-5 h-5" /> },
   { id: 'Favorites', name: 'My Favorites', icon: <Star className="w-5 h-5" /> },
+  { id: 'Multiplayer', name: '2-Player / Co-op', icon: <Users2 className="w-5 h-5" /> },
   { id: 'Action', name: 'Action', icon: <Flame className="w-5 h-5" /> },
   { id: 'Racing', name: 'Racing', icon: <Car className="w-5 h-5" /> },
   { id: 'Arcade', name: 'Arcade', icon: <Gamepad className="w-5 h-5" /> },

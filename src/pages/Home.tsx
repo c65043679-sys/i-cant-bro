@@ -88,6 +88,8 @@ export const Home: React.FC<HomeProps> = ({ searchQuery, activeCategory }) => {
         matchesCategory = true;
       } else if (activeCategory === 'Favorites') {
         matchesCategory = profile?.favorites?.includes(game.id) || false;
+      } else if (activeCategory === 'Multiplayer') {
+        matchesCategory = !!game.multiplayer || game.category === 'Multiplayer';
       } else if (activeCategory === 'Blocked') {
         // Handled via redirect or empty on Home
         matchesCategory = false;
@@ -153,7 +155,11 @@ export const Home: React.FC<HomeProps> = ({ searchQuery, activeCategory }) => {
           <div className="flex items-center gap-3">
             <h2 className="text-xl font-bold flex items-center gap-2">
               <span className="w-1.5 h-6 bg-[var(--accent)] rounded-full"></span>
-              {activeCategory === 'all' ? 'All Games' : `${activeCategory} Games`}
+              {activeCategory === 'all' 
+                ? 'All Games' 
+                : activeCategory === 'Multiplayer'
+                ? '2-Player & Multiplayer Games'
+                : `${activeCategory} Games`}
             </h2>
             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-white/5 border border-white/10 px-3 py-1 rounded-full font-mono">
               {sortedGames.length} Missions

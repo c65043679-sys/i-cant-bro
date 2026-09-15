@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ChevronLeft, Info, Gamepad2, Maximize2, Minimize2, Save, CheckCircle2, Heart, Zap, Moon, ZoomIn, Crown, ShieldAlert, Clock, Star } from 'lucide-react';
+import { ChevronLeft, Info, Gamepad2, Maximize2, Minimize2, Save, CheckCircle2, Heart, Zap, Moon, ZoomIn, Crown, ShieldAlert, Clock, Star, Users2 } from 'lucide-react';
 import { getAllGames } from '../utils/getAllGames';
 import { useAuth } from '../components/AuthContext';
 import { useSettings } from '../components/SettingsContext';
@@ -623,6 +623,15 @@ export const Play: React.FC = () => {
                 <h1 className="text-4xl sm:text-5xl font-black tracking-tight text-white">{game.title}</h1>
                 <div className="flex gap-2 items-center flex-wrap">
                    <span className="text-xs font-bold text-[var(--accent)] uppercase tracking-wider">{game.category}</span>
+                   {game.multiplayer && (
+                     <>
+                       <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">•</span>
+                       <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
+                         <Users2 className="w-3.5 h-3.5" />
+                         <span>{game.players || '2-Player / Multiplayer'}</span>
+                       </span>
+                     </>
+                   )}
                    <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">•</span>
                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Verified Nexus Content</span>
                 </div>
@@ -653,6 +662,15 @@ export const Play: React.FC = () => {
                     <span className="opacity-50">Genre</span>
                     <span className="text-white px-2 py-1 bg-[var(--accent)]/20 rounded-md border border-[var(--accent)]/30">{game.category}</span>
                   </div>
+                  {game.multiplayer && (
+                    <div className="flex justify-between items-center bg-white/5 p-2 rounded-lg">
+                      <span className="opacity-50">Players</span>
+                      <span className="text-emerald-400 font-bold flex items-center gap-1.5">
+                        <Users2 className="w-3 h-3" />
+                        <span>{game.players || '2 Players / Co-op'}</span>
+                      </span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center bg-white/5 p-2 rounded-lg">
                     <span className="opacity-50">Performance</span>
                     <span className="text-green-400">Verified</span>
