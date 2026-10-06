@@ -207,9 +207,6 @@ export const GAMES: Game[] = [
     controls: "Up arrow or W to accelerate, Down arrow or S to brake, Left/Right arrows or A/D to tilt and balance.",
     rating: 4.8,
     featured: true,
-    aspectRatio: "four-three",
-    nativeWidth: 720,
-    nativeHeight: 480,
     allow: "autoplay; fullscreen; camera; focus-without-user-activation *; monetization; gamepad; keyboard-map *; xr-spatial-tracking; clipboard-write",
     sandbox: "allow-forms allow-modals allow-orientation-lock allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-presentation allow-scripts allow-same-origin allow-downloads"
   },
@@ -224,9 +221,6 @@ export const GAMES: Game[] = [
     controls: "Up arrow or W to accelerate, Down arrow or S to brake, Left/Right arrows or A/D to tilt and balance.",
     rating: 4.8,
     featured: true,
-    aspectRatio: "four-three",
-    nativeWidth: 720,
-    nativeHeight: 480,
     allow: "autoplay; fullscreen; camera; focus-without-user-activation *; monetization; gamepad; keyboard-map *; xr-spatial-tracking; clipboard-write",
     sandbox: "allow-forms allow-modals allow-orientation-lock allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-presentation allow-scripts allow-same-origin allow-downloads"
   },
@@ -1173,9 +1167,9 @@ export const GAMES: Game[] = [
     rating: 4.9,
     featured: true,
     trending: true,
-    aspectRatio: "four-three",
-    nativeWidth: 800,
-    nativeHeight: 600,
+    aspectRatio: "five-four",
+    nativeWidth: 1000,
+    nativeHeight: 800,
     allow: "autoplay; fullscreen; focus-without-user-activation *; gamepad; keyboard-map *",
     sandbox: "allow-forms allow-modals allow-orientation-lock allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-presentation allow-scripts allow-same-origin allow-downloads"
   },
@@ -1190,9 +1184,6 @@ export const GAMES: Game[] = [
     controls: "Type letters on your physical keyboard or click the on-screen virtual keyboard to submit guesses. Press Enter to submit, Backspace to delete.",
     rating: 4.8,
     featured: true,
-    aspectRatio: "four-three",
-    nativeWidth: 600,
-    nativeHeight: 800,
     allow: "autoplay; fullscreen; clipboard-read; clipboard-write",
     sandbox: "allow-forms allow-modals allow-orientation-lock allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-presentation allow-scripts allow-same-origin allow-downloads"
   },
@@ -1209,9 +1200,6 @@ export const GAMES: Game[] = [
     trending: true,
     multiplayer: true,
     players: "Online / AI Derby",
-    aspectRatio: "video",
-    nativeWidth: 1280,
-    nativeHeight: 720,
     allow: "autoplay; fullscreen; gamepad; focus-without-user-activation *; keyboard-map *",
     sandbox: "allow-forms allow-modals allow-orientation-lock allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-presentation allow-scripts allow-same-origin allow-downloads"
   },
@@ -1225,9 +1213,6 @@ export const GAMES: Game[] = [
     iframe: "https://hub-pro.github.io/games/drawthehill/index.html",
     controls: "Click and drag or touch-draw with your mouse / finger to sketch hill paths and ramps ahead of your car.",
     rating: 4.7,
-    aspectRatio: "four-three",
-    nativeWidth: 800,
-    nativeHeight: 600,
     allow: "autoplay; fullscreen; focus-without-user-activation *; gamepad",
     sandbox: "allow-forms allow-modals allow-orientation-lock allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-presentation allow-scripts allow-same-origin allow-downloads"
   }

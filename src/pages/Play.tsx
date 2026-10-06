@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ChevronLeft, Info, Gamepad2, Maximize2, Minimize2, Save, CheckCircle2, Heart, Zap, Moon, ZoomIn, Crown, ShieldAlert, Clock, Star, Users2 } from 'lucide-react';
+import { ChevronLeft, Info, Gamepad2, Maximize2, Minimize2, Save, CheckCircle2, Heart, Zap, Moon, ZoomIn, Crown, ShieldAlert, Clock, Star, Users2, Expand, Shrink } from 'lucide-react';
 import { getAllGames } from '../utils/getAllGames';
 import { useAuth } from '../components/AuthContext';
 import { useSettings } from '../components/SettingsContext';
@@ -54,6 +54,7 @@ export const Play: React.FC = () => {
   const [containerWidth, setContainerWidth] = useState<number>(0);
   const [containerHeight, setContainerHeight] = useState<number>(0);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [isExpanded, setIsExpanded] = useState<boolean>(() => localStorage.getItem('nexus_player_expanded') !== 'false');
   const [isNearFullscreen, setIsNearFullscreen] = useState<boolean>(false);
   const fsProximityRef = useRef<HTMLDivElement>(null);
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -202,6 +203,15 @@ export const Play: React.FC = () => {
   useEffect(() => {
     if (!containerRef.current) return;
     
+    const updateDims = () => {
+      if (containerRef.current) {
+        setContainerWidth(containerRef.current.clientWidth);
+        setContainerHeight(containerRef.current.clientHeight);
+      }
+    };
+
+    updateDims();
+
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
         setContainerWidth(entry.target.clientWidth);
@@ -210,13 +220,13 @@ export const Play: React.FC = () => {
     });
     
     resizeObserver.observe(containerRef.current);
-    setContainerWidth(containerRef.current.clientWidth);
-    setContainerHeight(containerRef.current.clientHeight);
+    window.addEventListener('resize', updateDims);
     
     return () => {
       resizeObserver.disconnect();
+      window.removeEventListener('resize', updateDims);
     };
-  }, [id]);
+  }, [id, isExpanded, isFullscreen]);
 
   useEffect(() => {
     // Focus game iframe when loading or switching games
@@ -312,14 +322,20 @@ export const Play: React.FC = () => {
     !game.iframe.includes('/supermario64/') && 
     !game.iframe.includes('/superhot/') && 
     !game.iframe.includes('/animalcrossing') && 
-    !game.iframe.includes('/aceattorney/'))
+    !game.iframe.includes('/aceattorney/') &&
+    !game.iframe.includes('/rocketsoccer/') &&
+    !game.iframe.includes('/wordle/') &&
+    !game.iframe.includes('/drawthehill/') &&
+    !game.iframe.includes('/motox3m'))
   ) : false;
 
   const effectiveAspectRatio = game?.aspectRatio || (isRuffleFlashGame ? 'five-four' : undefined);
   const globalScaleMultiplier = (settings.gameScale || 100) / 100;
 
   return (
-    <div className={`flex-1 max-w-[1440px] mx-auto p-8 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 relative ${settings.theaterMode ? 'bg-black/80 rounded-3xl p-6 transition-colors' : ''}`}>
+    <div className={`flex-1 transition-all duration-500 mx-auto p-4 sm:p-8 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 relative ${
+      isExpanded ? 'w-full max-w-[1920px]' : 'max-w-[1440px]'
+    } ${settings.theaterMode ? 'bg-black/80 rounded-3xl p-6 transition-colors' : ''}`}>
       <div className="flex items-center justify-between">
         <Link 
           to="/" 
@@ -363,6 +379,32 @@ export const Play: React.FC = () => {
           </button>
 
           <button
+            onClick={() => {
+              setIsExpanded(prev => {
+                const next = !prev;
+                localStorage.setItem('nexus_player_expanded', String(next));
+                return next;
+              });
+            }}
+            onPointerDown={() => {
+              setIsExpanded(prev => {
+                const next = !prev;
+                localStorage.setItem('nexus_player_expanded', String(next));
+                return next;
+              });
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all border cursor-pointer ${
+              isExpanded 
+                ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-lg shadow-[var(--accent)]/20' 
+                : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10 hover:text-white'
+            }`}
+            title={isExpanded ? "Collapse Stage Width" : "Fill Available Stage Width"}
+          >
+            {isExpanded ? <Shrink className="w-3.5 h-3.5" /> : <Expand className="w-3.5 h-3.5" />}
+            <span className="hidden sm:inline">{isExpanded ? 'Full Space' : 'Fill Space'}</span>
+          </button>
+
+          <button
             onClick={() => updateSetting('theaterMode', !settings.theaterMode)}
             onPointerDown={() => updateSetting('theaterMode', !settings.theaterMode)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all border cursor-pointer ${
@@ -376,9 +418,9 @@ export const Play: React.FC = () => {
             <span className="hidden sm:inline">Theater</span>
           </button>
 
-          <div className="hidden md:flex items-center bg-white/5 border border-white/10 rounded-full px-2 py-0.5 text-xs font-bold text-slate-400">
-            <ZoomIn className="w-3.5 h-3.5 mr-1 text-slate-500" />
-            {[90, 100, 110, 125].map((scale) => (
+          <div className="flex items-center bg-white/5 border border-white/10 rounded-full px-2 py-0.5 text-xs font-bold text-slate-400">
+            <ZoomIn className="w-3.5 h-3.5 mr-1 text-slate-500 shrink-0" />
+            {[80, 90, 100, 110, 125].map((scale) => (
               <button
                 key={scale}
                 onClick={() => updateSetting('gameScale', scale)}
@@ -456,37 +498,31 @@ export const Play: React.FC = () => {
                 } catch (e) {}
               }
             }}
-            className={`relative bg-black overflow-hidden group/player cursor-pointer transition-all w-full ${
+            className={`relative bg-black overflow-hidden group/player cursor-pointer transition-all duration-300 w-full ${
               isFullscreen 
                 ? 'w-screen h-screen rounded-none border-none' 
                 : `rounded-3xl shadow-2xl shadow-[var(--accent)]/10 border border-white/10 ${
                     godModeAura ? 'ring-4 ring-amber-400/80 shadow-[0_0_60px_rgba(251,191,36,0.6)]' : ''
                   } ${
-                    effectiveAspectRatio === 'portrait' ? 'aspect-[3/4] max-w-md mx-auto max-h-[70vh]' : 
-                    effectiveAspectRatio === 'square' ? 'aspect-square max-w-2xl mx-auto max-h-[70vh]' : 
-                    effectiveAspectRatio === 'four-three' ? 'aspect-[4/3] max-w-4xl mx-auto max-h-[70vh]' :
-                    effectiveAspectRatio === 'five-four' ? 'aspect-[5/4] max-w-4xl mx-auto max-h-[70vh]' :
-                    'aspect-video max-w-5xl mx-auto max-h-[70vh]'
+                    isExpanded
+                      ? effectiveAspectRatio === 'portrait'
+                        ? 'aspect-[3/4] max-w-2xl mx-auto h-[86vh] max-h-[92vh]'
+                        : effectiveAspectRatio === 'square'
+                        ? 'aspect-square max-w-5xl mx-auto h-[86vh] max-h-[92vh]'
+                        : 'w-full h-[78vh] sm:h-[84vh] md:h-[88vh] max-h-[92vh]'
+                      : effectiveAspectRatio === 'portrait'
+                      ? 'aspect-[3/4] max-w-md mx-auto max-h-[70vh]'
+                      : effectiveAspectRatio === 'square'
+                      ? 'aspect-square max-w-2xl mx-auto max-h-[70vh]'
+                      : effectiveAspectRatio === 'four-three'
+                      ? 'aspect-[4/3] max-w-4xl mx-auto max-h-[70vh]'
+                      : effectiveAspectRatio === 'five-four'
+                      ? 'aspect-[5/4] max-w-4xl mx-auto max-h-[70vh]'
+                      : 'aspect-video max-w-5xl mx-auto max-h-[70vh]'
                   }`
             }`}
           >
             {(() => {
-              const isRuffleFlashGame = 
-                game.aspectRatio === 'five-four' ||
-                (game.nativeWidth === 1000 && game.nativeHeight === 800) ||
-                ((
-                  game.iframe.includes('hub-pro.github.io/games/') || 
-                  game.iframe.includes('class811.github.io') ||
-                  game.iframe.includes('theimpossiblequiz-online') ||
-                  game.iframe.includes('bloxorzunblocked') ||
-                  game.iframe.includes('happy-wheels-online')
-                ) && 
-                !game.iframe.includes('/slope/') && 
-                !game.iframe.includes('/supermario64/') && 
-                !game.iframe.includes('/superhot/') && 
-                !game.iframe.includes('/animalcrossing') && 
-                !game.iframe.includes('/aceattorney/'));
-
               const nativeW = game.nativeWidth || (isRuffleFlashGame ? 1000 : undefined);
               const nativeH = game.nativeHeight || (isRuffleFlashGame ? 800 : undefined);
               const hasNativeDimensions = !!(nativeW && nativeH);
@@ -499,11 +535,11 @@ export const Play: React.FC = () => {
               const scaledHeight = hasNativeDimensions ? nativeH * iframeScale : 0;
               
               const leftOffset = hasNativeDimensions && containerWidth > 0
-                ? (containerWidth - scaledWidth) / 2
+                ? Math.round((containerWidth - scaledWidth) / 2)
                 : 0;
                 
               const topOffset = hasNativeDimensions && containerHeight > 0
-                ? (containerHeight - scaledHeight) / 2
+                ? Math.round((containerHeight - scaledHeight) / 2)
                 : 0;
 
               const customScale = (game.scale || 1) * globalScaleMultiplier;
@@ -605,6 +641,60 @@ export const Play: React.FC = () => {
                     </span>
                   </button>
                 )}
+
+                {!isFullscreen && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsExpanded(prev => {
+                        const next = !prev;
+                        localStorage.setItem('nexus_player_expanded', String(next));
+                        return next;
+                      });
+                    }}
+                    className={`p-2.5 rounded-full border text-xs font-medium backdrop-blur-xl shadow-2xl transition-all duration-200 flex items-center justify-center cursor-pointer active:scale-95 ${
+                      isExpanded
+                        ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-[var(--accent)]/20'
+                        : 'bg-slate-900/90 hover:bg-slate-800 border-white/10 text-slate-300 hover:text-white'
+                    }`}
+                    title={isExpanded ? "Collapse Stage" : "Fill Available Space"}
+                  >
+                    {isExpanded ? <Shrink className="w-4 h-4" /> : <Expand className="w-4 h-4" />}
+                  </button>
+                )}
+
+                <div 
+                  className="hidden sm:flex items-center bg-slate-900/90 border border-white/10 rounded-full px-2 py-1 text-xs backdrop-blur-xl shadow-2xl select-none"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    onClick={() => {
+                      const scales = [80, 90, 100, 110, 125];
+                      const current = settings.gameScale || 100;
+                      const next = scales.filter(s => s < current).pop() || 80;
+                      updateSetting('gameScale', next);
+                    }}
+                    className="px-1.5 text-slate-400 hover:text-white font-bold cursor-pointer transition-colors"
+                    title="Zoom Out"
+                  >
+                    -
+                  </button>
+                  <span className="px-1 text-[11px] font-mono text-slate-200 font-bold min-w-[34px] text-center">
+                    {settings.gameScale || 100}%
+                  </span>
+                  <button
+                    onClick={() => {
+                      const scales = [80, 90, 100, 110, 125];
+                      const current = settings.gameScale || 100;
+                      const next = scales.find(s => s > current) || 125;
+                      updateSetting('gameScale', next);
+                    }}
+                    className="px-1.5 text-slate-400 hover:text-white font-bold cursor-pointer transition-colors"
+                    title="Zoom In"
+                  >
+                    +
+                  </button>
+                </div>
 
                 <button 
                   onClick={toggleFullscreen}
