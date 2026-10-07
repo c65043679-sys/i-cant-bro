@@ -220,11 +220,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onSearch, searchQuery = '' }) =>
               try { (document.activeElement as HTMLElement)?.blur(); window.focus(); } catch (e) {}
             }
           }}
-          onPointerDown={() => {
-            if (document.activeElement?.tagName?.toLowerCase() === 'iframe') {
-              try { (document.activeElement as HTMLElement)?.blur(); window.focus(); } catch (e) {}
-            }
-          }}
           className="flex items-center gap-2.5 group"
         >
           <div className="w-8 h-8 bg-[var(--accent)] text-white rounded-lg flex items-center justify-center font-black text-base shadow-md shadow-[var(--accent)]/30 group-hover:scale-105 transition-all">
@@ -440,11 +435,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onSearch, searchQuery = '' }) =>
               try { (document.activeElement as HTMLElement)?.blur(); window.focus(); } catch (e) {}
             }
           }}
-          onPointerDown={() => {
-            if (document.activeElement?.tagName?.toLowerCase() === 'iframe') {
-              try { (document.activeElement as HTMLElement)?.blur(); window.focus(); } catch (e) {}
-            }
-          }}
           className="flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 bg-amber-500/20 border border-amber-500/40 hover:bg-amber-500/30 text-amber-300 text-[11px] sm:text-xs font-bold rounded-full transition-all active:scale-95 shadow-sm shadow-amber-500/10 cursor-pointer"
         >
           <Package className="w-3.5 h-3.5 text-amber-400" />
@@ -459,11 +449,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onSearch, searchQuery = '' }) =>
               try { (document.activeElement as HTMLElement)?.blur(); window.focus(); } catch (e) {}
             }
           }}
-          onPointerDown={() => {
-            if (document.activeElement?.tagName?.toLowerCase() === 'iframe') {
-              try { (document.activeElement as HTMLElement)?.blur(); window.focus(); } catch (e) {}
-            }
-          }}
           className="flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 text-amber-300 text-[11px] sm:text-xs font-semibold rounded-full transition-all active:scale-95 shadow-sm cursor-pointer"
         >
           <Medal className="w-3.5 h-3.5 text-amber-400" />
@@ -474,11 +459,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onSearch, searchQuery = '' }) =>
           to="/achievements"
           title="View Achievements & XP Level"
           onClick={() => {
-            if (document.activeElement?.tagName?.toLowerCase() === 'iframe') {
-              try { (document.activeElement as HTMLElement)?.blur(); window.focus(); } catch (e) {}
-            }
-          }}
-          onPointerDown={() => {
             if (document.activeElement?.tagName?.toLowerCase() === 'iframe') {
               try { (document.activeElement as HTMLElement)?.blur(); window.focus(); } catch (e) {}
             }

@@ -344,11 +344,6 @@ export const Play: React.FC = () => {
               try { (document.activeElement as HTMLElement)?.blur(); window.focus(); } catch (e) {}
             }
           }}
-          onPointerDown={() => {
-            if (document.activeElement?.tagName?.toLowerCase() === 'iframe') {
-              try { (document.activeElement as HTMLElement)?.blur(); window.focus(); } catch (e) {}
-            }
-          }}
           className="flex items-center gap-3 text-slate-400 hover:text-white transition-colors group cursor-pointer"
         >
           <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-white/10 transition-colors">
@@ -358,8 +353,8 @@ export const Play: React.FC = () => {
         </Link>
         <div className="flex items-center gap-3">
           <button
+            type="button"
             onClick={triggerPanic}
-            onPointerDown={triggerPanic}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 transition-all shadow-lg shadow-red-500/10 cursor-pointer active:scale-95 group/topPanic"
             title={`Emergency Panic Redirect (${settings.panicKey})`}
           >
@@ -379,21 +374,17 @@ export const Play: React.FC = () => {
           </button>
 
           <button
-            onClick={() => {
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
               setIsExpanded(prev => {
                 const next = !prev;
                 localStorage.setItem('nexus_player_expanded', String(next));
                 return next;
               });
             }}
-            onPointerDown={() => {
-              setIsExpanded(prev => {
-                const next = !prev;
-                localStorage.setItem('nexus_player_expanded', String(next));
-                return next;
-              });
-            }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all border cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all border cursor-pointer active:scale-95 ${
               isExpanded 
                 ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-lg shadow-[var(--accent)]/20' 
                 : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10 hover:text-white'
@@ -405,9 +396,9 @@ export const Play: React.FC = () => {
           </button>
 
           <button
+            type="button"
             onClick={() => updateSetting('theaterMode', !settings.theaterMode)}
-            onPointerDown={() => updateSetting('theaterMode', !settings.theaterMode)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all border cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all border cursor-pointer active:scale-95 ${
               settings.theaterMode 
                 ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-lg shadow-[var(--accent)]/20' 
                 : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10 hover:text-white'
@@ -423,8 +414,8 @@ export const Play: React.FC = () => {
             {[80, 90, 100, 110, 125].map((scale) => (
               <button
                 key={scale}
+                type="button"
                 onClick={() => updateSetting('gameScale', scale)}
-                onPointerDown={() => updateSetting('gameScale', scale)}
                 className={`px-2 py-0.5 rounded-full transition-all text-[10px] cursor-pointer ${
                   settings.gameScale === scale ? 'bg-[var(--accent)] text-white font-bold' : 'hover:text-white'
                 }`}
@@ -446,9 +437,9 @@ export const Play: React.FC = () => {
           {user && (
             <>
               <button
+                type="button"
                 onClick={handleToggleFavorite}
-                onPointerDown={handleToggleFavorite}
-                className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-300 border cursor-pointer ${
+                className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-300 border cursor-pointer active:scale-95 ${
                   isFavorited 
                     ? 'bg-rose-500/20 border-rose-500/30 text-rose-500' 
                     : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10 hover:text-white'
@@ -458,10 +449,10 @@ export const Play: React.FC = () => {
                 {isFavorited ? 'Favorited' : 'Favorite'}
               </button>
               <button
+                type="button"
                 onClick={handleSaveData}
-                onPointerDown={handleSaveData}
                 disabled={isSaving}
-                className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-300 border cursor-pointer ${
+                className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-300 border cursor-pointer active:scale-95 ${
                   saveSuccess 
                     ? 'bg-green-500/20 border-green-500/30 text-green-400' 
                     : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10 hover:text-white'
@@ -644,7 +635,9 @@ export const Play: React.FC = () => {
 
                 {!isFullscreen && (
                   <button
+                    type="button"
                     onClick={(e) => {
+                      e.preventDefault();
                       e.stopPropagation();
                       setIsExpanded(prev => {
                         const next = !prev;
@@ -784,11 +777,6 @@ export const Play: React.FC = () => {
                   key={relatedGame.id} 
                   to={`/play/${relatedGame.id}`}
                   onClick={() => {
-                    if (document.activeElement?.tagName?.toLowerCase() === 'iframe') {
-                      try { (document.activeElement as HTMLElement)?.blur(); window.focus(); } catch (e) {}
-                    }
-                  }}
-                  onPointerDown={() => {
                     if (document.activeElement?.tagName?.toLowerCase() === 'iframe') {
                       try { (document.activeElement as HTMLElement)?.blur(); window.focus(); } catch (e) {}
                     }

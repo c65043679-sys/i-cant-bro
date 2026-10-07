@@ -64,15 +64,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeCategory, onCategoryChan
                     navigate('/');
                   }
                 }}
-                onPointerDown={() => {
-                  if (document.activeElement?.tagName?.toLowerCase() === 'iframe') {
-                    try { (document.activeElement as HTMLElement)?.blur(); window.focus(); } catch (e) {}
-                  }
-                  onCategoryChange(cat.id);
-                  if (location.pathname !== '/') {
-                    navigate('/');
-                  }
-                }}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-all cursor-pointer ${
                   isActive
                     ? 'bg-[var(--accent)]/15 text-white border-[var(--accent)]/30 font-semibold'
