@@ -312,6 +312,75 @@ class SoundManager {
       // Ignore
     }
   }
+
+  // Enigma 37 Rune Unlock Sound (mystic resonant chime)
+  playEnigmaRuneUnlock(enabled: boolean = true) {
+    if (!enabled) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    try {
+      const now = ctx.currentTime;
+      const gain = ctx.createGain();
+      gain.connect(ctx.destination);
+
+      [440.0, 554.37, 659.25, 880.0, 1108.73].forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + i * 0.08);
+        gain.gain.setValueAtTime(0.14, now + i * 0.08);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.08 + 0.6);
+        osc.connect(gain);
+        osc.start(now + i * 0.08);
+        osc.stop(now + i * 0.08 + 0.6);
+      });
+    } catch (e) {}
+  }
+
+  // Enigma Terminal Mechanical Click
+  playEnigmaTerminalKeystroke(enabled: boolean = true) {
+    if (!enabled) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    try {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(800 + Math.random() * 200, ctx.currentTime);
+      gain.gain.setValueAtTime(0.02, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.03);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.03);
+    } catch (e) {}
+  }
+
+  // Apex Ascension Grand Fanfare for 37/37 completion
+  playApexAscension(enabled: boolean = true) {
+    if (!enabled) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    try {
+      const now = ctx.currentTime;
+      const gain = ctx.createGain();
+      gain.connect(ctx.destination);
+
+      const chord = [220.0, 329.63, 440.0, 554.37, 659.25, 880.0, 1108.73, 1318.51, 1760.0];
+      chord.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        osc.type = idx % 2 === 0 ? 'sine' : 'triangle';
+        osc.frequency.setValueAtTime(freq, now + idx * 0.1);
+        gain.gain.setValueAtTime(0.2, now + idx * 0.1);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.1 + 1.8);
+        osc.connect(gain);
+        osc.start(now + idx * 0.1);
+        osc.stop(now + idx * 0.1 + 1.8);
+      });
+    } catch (e) {}
+  }
 }
 
 export const soundManager = new SoundManager();

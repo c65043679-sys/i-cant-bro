@@ -24,6 +24,7 @@ import { AvatarDisplay } from './AvatarDisplay';
 import { getHlAccountName } from '../utils/nameGenerator';
 import { getAllGames } from '../utils/getAllGames';
 import { Game } from '../types';
+import { useEasterEgg } from '../context/EasterEggContext';
 
 const RECENT_SEARCHES_KEY = 'nexus_recent_searches';
 const MAX_RECENT_SEARCHES = 8;
@@ -91,6 +92,7 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({ onSearch, searchQuery = '' }) => {
   const { user, profile, signIn, isOwner } = useAuth();
   const { unlocked, unlockAchievement } = useAchievements();
+  const { solvePart, openCodex } = useEasterEgg();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -98,6 +100,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onSearch, searchQuery = '' }) =>
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>(() => getStoredRecentSearches());
   const [allGames, setAllGames] = useState<Game[]>(() => getAllGames());
+
+  // Search pilgrimage tracking for Part 5 (void -> abyss -> nexus within 30s)
+  const searchSequenceRef = useRef<Array<{ term: string; time: number }>>([]);
 
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -137,6 +142,11 @@ export const Navbar: React.FC<NavbarProps> = ({ onSearch, searchQuery = '' }) =>
 
     if (nextCount >= 5) {
       try { unlockAchievement('easter_egg_king'); } catch (err) {}
+    }
+
+    // Part 3: The Septenary Sigil (7 taps within 3s)
+    if (nextCount >= 7) {
+      solvePart(3, 'live_action');
       setLogoTapCount(0);
     }
 
@@ -155,6 +165,37 @@ export const Navbar: React.FC<NavbarProps> = ({ onSearch, searchQuery = '' }) =>
     }
     setInputValue(trimmed);
     onSearch(trimmed);
+
+    // Easter egg search triggers
+    const lowerTrimmed = trimmed.toLowerCase();
+    const now = Date.now();
+
+    // Seal 2: Binary 10
+    if (
+      lowerTrimmed === '00110001 00110000' ||
+      lowerTrimmed === '0011000100110000' ||
+      lowerTrimmed === '00110011 00110111' ||
+      lowerTrimmed === '0011001100110111'
+    ) {
+      solvePart(2, 'live_action');
+    }
+
+    // Open Codex on 10, 37, or enigma search
+    if (lowerTrimmed === '10' || lowerTrimmed === '37' || lowerTrimmed === 'enigma' || lowerTrimmed === 'codex' || lowerTrimmed === 'easteregg') {
+      openCodex();
+    }
+
+    // Part 5: Void -> Abyss -> Nexus within 30s
+    if (['void', 'abyss', 'nexus'].includes(lowerTrimmed)) {
+      searchSequenceRef.current.push({ term: lowerTrimmed, time: now });
+      searchSequenceRef.current = searchSequenceRef.current.filter(item => now - item.time <= 30000);
+      const recentTerms = searchSequenceRef.current.map(item => item.term);
+      const lastThree = recentTerms.slice(-3);
+      if (lastThree[0] === 'void' && lastThree[1] === 'abyss' && lastThree[2] === 'nexus') {
+        solvePart(5, 'live_action');
+      }
+    }
+
     if (trimmed.length >= 2) {
       try { unlockAchievement('search_master'); } catch (err) {}
     }

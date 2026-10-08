@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { useAchievements, ACHIEVEMENTS_CATALOG } from '../components/AchievementsContext';
 import { useAuth } from '../components/AuthContext';
+import { useEasterEgg } from '../context/EasterEggContext';
 import { 
   Trophy, 
   Star, 
@@ -58,6 +59,7 @@ const TIER_BADGES: Record<string, string> = {
 export const Achievements: React.FC = () => {
   const { isOwner, user } = useAuth();
   const { unlocked, totalXp, level, levelTitle, unlockAchievement, unlockAllAchievements, getProgress } = useAchievements();
+  const { openCodex } = useEasterEgg();
   const [filter, setFilter] = useState<'all' | 'unlocked' | 'locked' | 'secret'>('all');
 
   useEffect(() => {
@@ -271,6 +273,37 @@ export const Achievements: React.FC = () => {
             </motion.div>
           );
         })}
+
+        {/* Hidden ARG Enigma Card for Secret Seekers */}
+        {filter === 'secret' && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="sm:col-span-2 lg:col-span-3 rounded-2xl p-5 border border-dashed border-amber-500/30 bg-amber-500/5 backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-4"
+          >
+            <div className="flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 font-mono font-black text-lg flex items-center justify-center shrink-0">
+                ᚱ
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-amber-300 flex items-center gap-2">
+                  <span>The 10 Seals of Nexus</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono font-bold">Classified ARG</span>
+                </h4>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Ten arcane seals lie dormant across this domain. Zero hints are given. Decipher the riddles or invoke the terminal (~).
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => openCodex()}
+              className="px-4 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 text-xs font-mono font-bold transition-all active:scale-95 flex items-center gap-2 cursor-pointer shadow-sm shadow-amber-500/10 shrink-0"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+              <span>[ Open Codex ᚱ 10 ]</span>
+            </button>
+          </motion.div>
+        )}
       </div>
     </div>
   );

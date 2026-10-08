@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { useAuth } from '../components/AuthContext';
 import { useSettings, TAB_CLOAK_PRESETS, CANVAS_THEMES } from '../components/SettingsContext';
 import { useAchievements } from '../components/AchievementsContext';
+import { useEasterEgg } from '../context/EasterEggContext';
 import { generateGamerTag, getHlAccountName, HL_ENEMIES } from '../utils/nameGenerator';
 import { formatPlayTime, formatPlayTimeDetailed } from '../hooks/usePlayTimeTracker';
 import { db } from '../lib/firebase';
@@ -50,6 +51,45 @@ export const Settings: React.FC = () => {
   const { user, profile, updateProfile, isOwner, signIn } = useAuth();
   const { settings, updateSetting, updateSettings, resetSettings, triggerPanic: rawTriggerPanic } = useSettings();
   const { unlockAchievement, wipeAllProgress, gamesPlayed, levelTitle } = useAchievements();
+  const { solvePart, openCodex } = useEasterEgg();
+
+  // Easter egg tracking refs
+  const meshToggleTimesRef = React.useRef<number[]>([]);
+  const sfxToggleTimesRef = React.useRef<number[]>([]);
+
+  const handleCustomColorChange = (hex: string) => {
+    updateSetting('themeColor', hex);
+    try { unlockAchievement('aesthetic_master'); } catch (e) {}
+
+    // Seal 4: The Shade of Ten
+    const clean = hex.toLowerCase().trim();
+    if (clean === '#101010' || clean === '101010' || clean === '#373737' || clean === '373737' || clean === '#0a0a0a') {
+      solvePart(4, 'live_action');
+    }
+  };
+
+  const handleMeshToggle = () => {
+    updateSetting('enableMeshGradient', !settings.enableMeshGradient);
+    // Part 15: The Aurora Strobe (4 rapid toggles)
+    const now = Date.now();
+    meshToggleTimesRef.current.push(now);
+    meshToggleTimesRef.current = meshToggleTimesRef.current.filter(t => now - t <= 3000);
+    if (meshToggleTimesRef.current.length >= 4) {
+      solvePart(15, 'live_action');
+    }
+  };
+
+  const handleSfxToggle = () => {
+    updateSetting('uiSoundEffects', !settings.uiSoundEffects);
+    try { unlockAchievement('sound_maestro'); } catch (e) {}
+    // Part 17: The Acoustic Oscillation (5 rapid toggles)
+    const now = Date.now();
+    sfxToggleTimesRef.current.push(now);
+    sfxToggleTimesRef.current = sfxToggleTimesRef.current.filter(t => now - t <= 3000);
+    if (sfxToggleTimesRef.current.length >= 5) {
+      solvePart(17, 'live_action');
+    }
+  };
 
   const triggerPanic = () => {
     try { unlockAchievement('panic_agent'); } catch (e) {}
@@ -294,19 +334,13 @@ export const Settings: React.FC = () => {
                   <input
                     type="color"
                     value={settings.themeColor}
-                    onChange={(e) => {
-                      updateSetting('themeColor', e.target.value);
-                      try { unlockAchievement('aesthetic_master'); } catch (e) {}
-                    }}
+                    onChange={(e) => handleCustomColorChange(e.target.value)}
                     className="w-9 h-9 rounded-xl border border-white/20 bg-transparent cursor-pointer"
                   />
                   <input
                     type="text"
                     value={settings.themeColor}
-                    onChange={(e) => {
-                      updateSetting('themeColor', e.target.value);
-                      try { unlockAchievement('aesthetic_master'); } catch (e) {}
-                    }}
+                    onChange={(e) => handleCustomColorChange(e.target.value)}
                     className="w-28 bg-black/40 border border-white/10 rounded-xl px-3 py-1.5 text-xs font-mono text-white"
                   />
                 </div>
@@ -436,7 +470,7 @@ export const Settings: React.FC = () => {
                   <p className="text-xs text-slate-400">Enable glowing radial background graphics</p>
                 </div>
                 <button
-                  onClick={() => updateSetting('enableMeshGradient', !settings.enableMeshGradient)}
+                  onClick={handleMeshToggle}
                   className={`w-12 h-6 rounded-full relative transition-colors ${
                     settings.enableMeshGradient ? 'bg-[var(--accent)]' : 'bg-slate-800'
                   }`}
@@ -456,10 +490,7 @@ export const Settings: React.FC = () => {
                   <p className="text-xs text-slate-400">Play subtle audio clicks on buttons and triggers</p>
                 </div>
                 <button
-                  onClick={() => {
-                    updateSetting('uiSoundEffects', !settings.uiSoundEffects);
-                    try { unlockAchievement('sound_maestro'); } catch (e) {}
-                  }}
+                  onClick={handleSfxToggle}
                   className={`w-12 h-6 rounded-full relative transition-colors ${
                     settings.uiSoundEffects ? 'bg-[var(--accent)]' : 'bg-slate-800'
                   }`}
@@ -719,6 +750,20 @@ export const Settings: React.FC = () => {
             >
               <Trash2 className="w-4 h-4" />
               Wipe Account Progress
+            </button>
+          </div>
+
+          {/* Hidden ARG Enigma Terminal access in Settings */}
+          <div className="pt-2 flex items-center justify-between text-xs text-slate-600 select-none">
+            <span className="font-mono text-[10px] text-slate-700">KERNEL // REV_10.0</span>
+            <button
+              type="button"
+              onClick={() => openCodex()}
+              className="group flex items-center gap-1 text-[11px] font-mono text-slate-600 hover:text-amber-400/90 transition-colors cursor-pointer"
+              title="The 10 Seals Codex (~)"
+            >
+              <Sparkles className="w-3 h-3 opacity-30 group-hover:opacity-100 group-hover:text-amber-400 transition-opacity" />
+              <span>[ ᚱ 10 ]</span>
             </button>
           </div>
         </aside>

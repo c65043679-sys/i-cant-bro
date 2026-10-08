@@ -7,6 +7,7 @@ import { useAuth } from '../components/AuthContext';
 import { useAchievements } from '../components/AchievementsContext';
 import { soundManager } from '../utils/soundEffects';
 import { useSettings } from '../components/SettingsContext';
+import { useEasterEgg } from '../context/EasterEggContext';
 
 interface InspectedItem {
   item: AvatarItem;
@@ -18,6 +19,27 @@ export const CasesAndInventory: React.FC = () => {
   const { profile, equipAvatar, unlockAvatar, lockAvatar, isOwner } = useAuth();
   const { gamePoints, spendGamePoints, addGamePoints, availableXp, spendXp, refundXp } = useAchievements();
   const { settings } = useSettings();
+  const { solvePart } = useEasterEgg();
+
+  const caseKnockTimesRef = useRef<number[]>([]);
+
+  const handleCaseKnock = () => {
+    soundManager.playClick(true);
+    const now = Date.now();
+    caseKnockTimesRef.current.push(now);
+    caseKnockTimesRef.current = caseKnockTimesRef.current.filter(t => now - t <= 3000);
+    if (caseKnockTimesRef.current.length >= 7) {
+      solvePart(18, 'live_action');
+    }
+  };
+
+  const handleInspectAvatar = (item: AvatarItem, floatVal?: string, wearGrade?: string) => {
+    setInspectedItem({ item, floatVal, wearGrade });
+    // Part 19: The Transmutation Mirage (Equip Initiate Core & inspect Mythic/Legendary)
+    if (equippedId === 'initiate_core' && (item.id === 'cosmic_overlord' || item.rarity === 'mythic' || item.rarity === 'legendary')) {
+      solvePart(19, 'live_action');
+    }
+  };
 
   const [activeTab, setActiveTab] = useState<'cases' | 'inventory' | 'tradeup'>('cases');
   const [selectedRarityFilter, setSelectedRarityFilter] = useState<string>('all');
@@ -576,7 +598,11 @@ export const CasesAndInventory: React.FC = () => {
 
                     {/* Crate Visual representation */}
                     <div className="py-6 flex justify-center">
-                      <div className="w-28 h-28 rounded-2xl bg-slate-950/80 border border-white/10 flex items-center justify-center relative shadow-2xl group-hover:scale-105 transition-transform">
+                      <div 
+                        onClick={handleCaseKnock}
+                        className="w-28 h-28 rounded-2xl bg-slate-950/80 border border-white/10 flex items-center justify-center relative shadow-2xl group-hover:scale-105 transition-transform cursor-pointer select-none active:scale-95"
+                        title="Knock on Crate (x7)"
+                      >
                         <Package className="w-14 h-14 text-amber-400 drop-shadow-[0_0_20px_rgba(251,191,36,0.6)]" />
                         <Sparkles className="w-5 h-5 text-yellow-300 absolute -top-1 -right-1 animate-pulse" />
                       </div>
@@ -600,7 +626,7 @@ export const CasesAndInventory: React.FC = () => {
                               key={avId}
                               onClick={() => {
                                 const { floatStr, wear } = getAvatarFloatAndWear(av.id);
-                                setInspectedItem({ item: av, floatVal: floatStr, wearGrade: wear });
+                                handleInspectAvatar(av, floatStr, wear);
                               }}
                               className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-slate-950/70 border border-white/5 hover:border-white/20 transition-all cursor-pointer group/item"
                             >
@@ -877,7 +903,7 @@ export const CasesAndInventory: React.FC = () => {
                           <button
                             onClick={() => {
                               const { floatStr, wear } = getAvatarFloatAndWear(item.id);
-                              setInspectedItem({ item, floatVal: floatStr, wearGrade: wear });
+                              handleInspectAvatar(item, floatStr, wear);
                             }}
                             className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors cursor-pointer shrink-0"
                             title="Inspect Item"
@@ -889,7 +915,7 @@ export const CasesAndInventory: React.FC = () => {
                         <button
                           onClick={() => {
                             const { floatStr, wear } = getAvatarFloatAndWear(item.id);
-                            setInspectedItem({ item, floatVal: floatStr, wearGrade: `Locked (${wear})` });
+                            handleInspectAvatar(item, floatStr, `Locked (${wear})`);
                           }}
                           className="w-full py-2 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-slate-400 border border-white/5 transition-colors cursor-pointer"
                         >

@@ -10,13 +10,20 @@ import { db } from '../lib/firebase';
 import { doc, setDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
 import { GameCard } from '../components/GameCard';
 import { recordRecentlyPlayed } from '../utils/recentlyPlayed';
+import { useEasterEgg } from '../context/EasterEggContext';
 
 export const Play: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { user, profile, toggleFavorite, isOwner } = useAuth();
   const { settings, updateSetting, triggerPanic } = useSettings();
   const { unlockAchievement, incrementProgress, recordGamePlay, addGameTimePoints } = useAchievements();
+  const { solvePart } = useEasterEgg();
   const { sessionSeconds, formattedSessionTime, formattedTotalPlayTime } = usePlayTimeTracker();
+
+  // Easter egg tracking refs
+  const zoomSeqRef = useRef<Array<{ scale: number; time: number }>>([]);
+  const fillToggleTimesRef = useRef<number[]>([]);
+  const favToggleTimesRef = useRef<number[]>([]);
   const allGames = useMemo(() => getAllGames(), []);
   const game = useMemo(() => {
     return allGames.find((g) => g.id === id);
@@ -94,10 +101,19 @@ export const Play: React.FC = () => {
       if (hour >= 22 || hour < 5) {
         unlockAchievement('night_owl');
       }
+
+      // Part 11: The Triumvirate of Trials (worlds-hardest-game -> retro-bowl -> super-mario-64)
+      const key = 'nexus_triumvirate_seq';
+      const prev = JSON.parse(sessionStorage.getItem(key) || '[]');
+      const next = [...prev, id].slice(-3);
+      sessionStorage.setItem(key, JSON.stringify(next));
+      if (next[0] === 'worlds-hardest-game' && next[1] === 'retro-bowl' && next[2] === 'super-mario-64') {
+        solvePart(11, 'live_action');
+      }
     } catch (e) {
       console.error(e);
     }
-  }, [id, game, recordGamePlay, unlockAchievement, incrementProgress]);
+  }, [id, game, recordGamePlay, unlockAchievement, incrementProgress, solvePart]);
 
   // Active playtime reward timer: +10 pts every 60 seconds of active playing
   useEffect(() => {
@@ -253,8 +269,67 @@ export const Play: React.FC = () => {
 
   const isFavorited = profile?.favorites?.includes(game?.id || '');
 
+  const lastToggleExpandedTimeRef = useRef<number>(0);
+
+  const handleToggleExpanded = (e?: React.SyntheticEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    const now = Date.now();
+    // Debounce rapid double-events (e.g. pointerdown followed immediately by click)
+    if (now - lastToggleExpandedTimeRef.current < 250) {
+      return;
+    }
+    lastToggleExpandedTimeRef.current = now;
+
+    // Immediately reclaim focus from iframe to page
+    if (document.activeElement?.tagName?.toLowerCase() === 'iframe') {
+      try {
+        (document.activeElement as HTMLElement)?.blur();
+        window.focus();
+      } catch (err) {}
+    }
+
+    // Part 30: The Red Square Accord (3 toggles on hardest game)
+    if (id === 'worlds-hardest-game') {
+      fillToggleTimesRef.current.push(now);
+      fillToggleTimesRef.current = fillToggleTimesRef.current.filter(t => now - t <= 5000);
+      if (fillToggleTimesRef.current.length >= 3) {
+        solvePart(30, 'live_action');
+      }
+    }
+
+    setIsExpanded(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('nexus_player_expanded', String(next));
+      } catch (err) {}
+      return next;
+    });
+
+    // Force recalculation of container bounds across transition
+    const updateDimensions = () => {
+      if (containerRef.current) {
+        setContainerWidth(containerRef.current.clientWidth);
+        setContainerHeight(containerRef.current.clientHeight);
+      }
+    };
+    requestAnimationFrame(updateDimensions);
+    setTimeout(updateDimensions, 60);
+    setTimeout(updateDimensions, 320);
+  };
+
   const handleToggleFavorite = async () => {
     if (game?.id) {
+      // Part 31: The Fickle Constellation
+      const now = Date.now();
+      favToggleTimesRef.current.push(now);
+      favToggleTimesRef.current = favToggleTimesRef.current.filter(t => now - t <= 6000);
+      if (favToggleTimesRef.current.length >= 3) {
+        solvePart(31, 'live_action');
+      }
+
       await toggleFavorite(game.id);
     }
   };
@@ -351,16 +426,27 @@ export const Play: React.FC = () => {
           </div>
           <span className="text-sm font-semibold uppercase tracking-widest text-slate-500">Nexus Core</span>
         </Link>
-        <div className="flex items-center gap-3">
+        <div 
+          className="flex items-center gap-3 flex-wrap sm:flex-nowrap select-none"
+          onMouseEnter={() => {
+            if (document.activeElement?.tagName?.toLowerCase() === 'iframe') {
+              try {
+                (document.activeElement as HTMLElement)?.blur();
+                window.focus();
+              } catch (e) {}
+            }
+          }}
+        >
           <button
             type="button"
+            draggable={false}
             onClick={triggerPanic}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 transition-all shadow-lg shadow-red-500/10 cursor-pointer active:scale-95 group/topPanic"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 transition-all shadow-lg shadow-red-500/10 cursor-pointer active:scale-95 group/topPanic select-none"
             title={`Emergency Panic Redirect (${settings.panicKey})`}
           >
-            <ShieldAlert className="w-3.5 h-3.5 text-red-400 group-hover/topPanic:scale-110 transition-transform" />
-            <span>Panic</span>
-            <span className="px-1.5 py-0.5 rounded bg-white/10 text-[10px] font-mono text-red-200 uppercase font-bold">
+            <ShieldAlert className="w-3.5 h-3.5 text-red-400 group-hover/topPanic:scale-110 transition-transform pointer-events-none" />
+            <span className="pointer-events-none">Panic</span>
+            <span className="px-1.5 py-0.5 rounded bg-white/10 text-[10px] font-mono text-red-200 uppercase font-bold pointer-events-none">
               {(() => {
                 switch (settings.panicKey) {
                   case 'Backquote': return '`';
@@ -375,48 +461,60 @@ export const Play: React.FC = () => {
 
           <button
             type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setIsExpanded(prev => {
-                const next = !prev;
-                localStorage.setItem('nexus_player_expanded', String(next));
-                return next;
-              });
+            draggable={false}
+            onDragStart={(e) => e.preventDefault()}
+            onPointerDown={(e) => {
+              if (e.button === 0) {
+                handleToggleExpanded(e);
+              }
             }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all border cursor-pointer active:scale-95 ${
+            onClick={handleToggleExpanded}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all border cursor-pointer active:scale-95 select-none ${
               isExpanded 
                 ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-lg shadow-[var(--accent)]/20' 
                 : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10 hover:text-white'
             }`}
             title={isExpanded ? "Collapse Stage Width" : "Fill Available Stage Width"}
           >
-            {isExpanded ? <Shrink className="w-3.5 h-3.5" /> : <Expand className="w-3.5 h-3.5" />}
-            <span className="hidden sm:inline">{isExpanded ? 'Full Space' : 'Fill Space'}</span>
+            {isExpanded ? <Shrink className="w-3.5 h-3.5 pointer-events-none" /> : <Expand className="w-3.5 h-3.5 pointer-events-none" />}
+            <span className="hidden sm:inline pointer-events-none select-none">{isExpanded ? 'Full Space' : 'Fill Space'}</span>
           </button>
 
           <button
             type="button"
+            draggable={false}
             onClick={() => updateSetting('theaterMode', !settings.theaterMode)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all border cursor-pointer active:scale-95 ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all border cursor-pointer active:scale-95 select-none ${
               settings.theaterMode 
                 ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-lg shadow-[var(--accent)]/20' 
                 : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10 hover:text-white'
             }`}
             title="Toggle Theater Dimmed Lighting"
           >
-            <Moon className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Theater</span>
+            <Moon className="w-3.5 h-3.5 pointer-events-none" />
+            <span className="hidden sm:inline pointer-events-none">Theater</span>
           </button>
 
-          <div className="flex items-center bg-white/5 border border-white/10 rounded-full px-2 py-0.5 text-xs font-bold text-slate-400">
-            <ZoomIn className="w-3.5 h-3.5 mr-1 text-slate-500 shrink-0" />
+          <div className="flex items-center bg-white/5 border border-white/10 rounded-full px-2 py-0.5 text-xs font-bold text-slate-400 select-none">
+            <ZoomIn className="w-3.5 h-3.5 mr-1 text-slate-500 shrink-0 pointer-events-none" />
             {[80, 90, 100, 110, 125].map((scale) => (
               <button
                 key={scale}
                 type="button"
-                onClick={() => updateSetting('gameScale', scale)}
-                className={`px-2 py-0.5 rounded-full transition-all text-[10px] cursor-pointer ${
+                draggable={false}
+                onClick={() => {
+                  updateSetting('gameScale', scale);
+
+                  // Part 13: Optical Harmonic (80% -> 125% -> 100%)
+                  const now = Date.now();
+                  zoomSeqRef.current.push({ scale, time: now });
+                  zoomSeqRef.current = zoomSeqRef.current.filter(t => now - t.time <= 10000);
+                  const lastThree = zoomSeqRef.current.slice(-3).map(t => t.scale);
+                  if (lastThree[0] === 80 && lastThree[1] === 125 && lastThree[2] === 100) {
+                    solvePart(13, 'live_action');
+                  }
+                }}
+                className={`px-2 py-0.5 rounded-full transition-all text-[10px] cursor-pointer select-none ${
                   settings.gameScale === scale ? 'bg-[var(--accent)] text-white font-bold' : 'hover:text-white'
                 }`}
               >
@@ -430,42 +528,44 @@ export const Play: React.FC = () => {
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-white/5 border border-white/10 text-slate-300 font-mono select-none"
             title={`Session Play Time: ${formattedSessionTime} • Total Profile Play Time: ${formattedTotalPlayTime}`}
           >
-            <Clock className="w-3.5 h-3.5 text-[var(--accent)] animate-pulse" />
-            <span>{formattedSessionTime}</span>
+            <Clock className="w-3.5 h-3.5 text-[var(--accent)] animate-pulse pointer-events-none" />
+            <span className="pointer-events-none">{formattedSessionTime}</span>
           </div>
 
           {user && (
             <>
               <button
                 type="button"
+                draggable={false}
                 onClick={handleToggleFavorite}
-                className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-300 border cursor-pointer active:scale-95 ${
+                className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-300 border cursor-pointer active:scale-95 select-none ${
                   isFavorited 
                     ? 'bg-rose-500/20 border-rose-500/30 text-rose-500' 
                     : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10 hover:text-white'
                 }`}
               >
-                <Heart className={`w-3.5 h-3.5 ${isFavorited ? 'fill-current' : ''}`} />
-                {isFavorited ? 'Favorited' : 'Favorite'}
+                <Heart className={`w-3.5 h-3.5 pointer-events-none ${isFavorited ? 'fill-current' : ''}`} />
+                <span className="pointer-events-none">{isFavorited ? 'Favorited' : 'Favorite'}</span>
               </button>
               <button
                 type="button"
+                draggable={false}
                 onClick={handleSaveData}
                 disabled={isSaving}
-                className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-300 border cursor-pointer active:scale-95 ${
+                className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-300 border cursor-pointer active:scale-95 select-none ${
                   saveSuccess 
                     ? 'bg-green-500/20 border-green-500/30 text-green-400' 
                     : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10 hover:text-white'
                 }`}
               >
                 {isSaving ? (
-                  <div className="w-3.5 h-3.5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                  <div className="w-3.5 h-3.5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin pointer-events-none" />
                 ) : saveSuccess ? (
-                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <CheckCircle2 className="w-3.5 h-3.5 pointer-events-none" />
                 ) : (
-                  <Save className="w-3.5 h-3.5" />
+                  <Save className="w-3.5 h-3.5 pointer-events-none" />
                 )}
-                {saveSuccess ? 'Saved' : 'Save'}
+                <span className="pointer-events-none">{saveSuccess ? 'Saved' : 'Save'}</span>
               </button>
             </>
           )}
@@ -636,23 +736,22 @@ export const Play: React.FC = () => {
                 {!isFullscreen && (
                   <button
                     type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setIsExpanded(prev => {
-                        const next = !prev;
-                        localStorage.setItem('nexus_player_expanded', String(next));
-                        return next;
-                      });
+                    draggable={false}
+                    onDragStart={(e) => e.preventDefault()}
+                    onPointerDown={(e) => {
+                      if (e.button === 0) {
+                        handleToggleExpanded(e);
+                      }
                     }}
-                    className={`p-2.5 rounded-full border text-xs font-medium backdrop-blur-xl shadow-2xl transition-all duration-200 flex items-center justify-center cursor-pointer active:scale-95 ${
+                    onClick={handleToggleExpanded}
+                    className={`p-2.5 rounded-full border text-xs font-medium backdrop-blur-xl shadow-2xl transition-all duration-200 flex items-center justify-center cursor-pointer active:scale-95 select-none ${
                       isExpanded
                         ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-[var(--accent)]/20'
                         : 'bg-slate-900/90 hover:bg-slate-800 border-white/10 text-slate-300 hover:text-white'
                     }`}
                     title={isExpanded ? "Collapse Stage" : "Fill Available Space"}
                   >
-                    {isExpanded ? <Shrink className="w-4 h-4" /> : <Expand className="w-4 h-4" />}
+                    {isExpanded ? <Shrink className="w-4 h-4 pointer-events-none" /> : <Expand className="w-4 h-4 pointer-events-none" />}
                   </button>
                 )}
 

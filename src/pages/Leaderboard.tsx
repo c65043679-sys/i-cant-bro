@@ -20,6 +20,7 @@ import { AvatarDisplay } from '../components/AvatarDisplay';
 import { db } from '../lib/firebase';
 import { collection, doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { generateGamerTag, getHlAccountName } from '../utils/nameGenerator';
+import { useEasterEgg } from '../context/EasterEggContext';
 
 export interface LeaderboardPlayer {
   uid: string;
@@ -108,6 +109,7 @@ export const DEFAULT_COMMUNITY_PLAYERS: LeaderboardPlayer[] = [
 export const Leaderboard: React.FC = () => {
   const { user, profile, isOwner, signIn } = useAuth();
   const { totalScore, totalXp, gamePoints, gamesPlayed, unlocked, levelTitle } = useAchievements();
+  const { solvePart } = useEasterEgg();
   const unlockedCount = Object.keys(unlocked).length;
 
   const [players, setPlayers] = useState<LeaderboardPlayer[]>([]);
@@ -665,7 +667,12 @@ export const Leaderboard: React.FC = () => {
                   return (
                     <tr 
                       key={player.uid}
-                      className={`transition-colors ${
+                      onClick={() => {
+                        if (idx === filteredPlayers.length - 1) {
+                          solvePart(22, 'live_action');
+                        }
+                      }}
+                      className={`transition-colors cursor-pointer ${
                         isUser
                           ? 'bg-indigo-950/40 hover:bg-indigo-900/50 font-medium border-l-4 border-l-indigo-500'
                           : 'hover:bg-white/5'

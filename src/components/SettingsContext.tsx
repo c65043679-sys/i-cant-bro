@@ -268,11 +268,21 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       return false;
     };
 
+    const panicTimestampsRef = { current: [] as number[] };
+
     const handleKeyDown = (e: KeyboardEvent) => {
       const targetTag = (e.target as HTMLElement)?.tagName?.toLowerCase();
       const isTyping = targetTag === 'input' || targetTag === 'textarea';
 
       if (isPanicMatch(e)) {
+        // Track rapid panic presses for Part 12 Easter egg
+        const now = Date.now();
+        panicTimestampsRef.current.push(now);
+        panicTimestampsRef.current = panicTimestampsRef.current.filter(t => now - t <= 2500);
+        if (panicTimestampsRef.current.length >= 3) {
+          window.dispatchEvent(new CustomEvent('nexus_easter_egg_trigger', { detail: { partId: 12 } }));
+        }
+
         if (!isTyping || settings.panicKey === 'AltP' || settings.panicKey === 'AltZ' || settings.panicKey === 'Escape') {
           try {
             e.preventDefault();

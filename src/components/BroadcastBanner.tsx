@@ -1,13 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Radio, X } from 'lucide-react';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { useEasterEgg } from '../context/EasterEggContext';
 
 export const BroadcastBanner: React.FC = () => {
+  const { solvePart } = useEasterEgg();
   const [announcement, setAnnouncement] = useState(() => {
     return localStorage.getItem('nexus_site_announcement') || '';
   });
   const [dismissed, setDismissed] = useState(false);
+  const clickCountRef = useRef(0);
+  const clickTimerRef = useRef<any>(null);
+
+  const handleBannerClick = () => {
+    clickCountRef.current++;
+    if (clickCountRef.current >= 3) {
+      solvePart(26, 'live_action');
+      clickCountRef.current = 0;
+    }
+    clearTimeout(clickTimerRef.current);
+    clickTimerRef.current = setTimeout(() => {
+      clickCountRef.current = 0;
+    }, 2500);
+  };
 
   useEffect(() => {
     let unsubscribeFirestore: (() => void) | null = null;
@@ -98,7 +114,10 @@ export const BroadcastBanner: React.FC = () => {
   if (!announcement || dismissed) return null;
 
   return (
-    <div className="bg-gradient-to-r from-amber-600 via-yellow-500 to-amber-600 text-black px-4 py-2 text-xs font-black flex items-center justify-between shadow-lg shadow-amber-500/10 z-[60] relative">
+    <div 
+      onClick={handleBannerClick}
+      className="bg-gradient-to-r from-amber-600 via-yellow-500 to-amber-600 text-black px-4 py-2 text-xs font-black flex items-center justify-between shadow-lg shadow-amber-500/10 z-[60] relative cursor-pointer select-none"
+    >
       <div className="flex items-center gap-2 max-w-4xl mx-auto truncate">
         <Radio className="w-4 h-4 shrink-0 animate-pulse" />
         <span className="truncate">{announcement}</span>

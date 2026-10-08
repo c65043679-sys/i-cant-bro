@@ -5,6 +5,7 @@ import { Category } from '../types';
 import { useAuth } from './AuthContext';
 import { AvatarDisplay } from './AvatarDisplay';
 import { getAllGames } from '../utils/getAllGames';
+import { useEasterEgg } from '../context/EasterEggContext';
 
 interface SidebarProps {
   activeCategory: Category;
@@ -25,8 +26,12 @@ const CATEGORIES: { id: Category; name: string; icon: React.ReactNode }[] = [
 
 export const Sidebar: React.FC<SidebarProps> = ({ activeCategory, onCategoryChange }) => {
   const { user, profile, signIn, logout, isAdmin, isOwner } = useAuth();
+  const { solvePart, openCodex } = useEasterEgg();
   const location = useLocation();
   const navigate = useNavigate();
+
+  // Part 23 tracking: Action -> Arcade/Retro -> Puzzle
+  const categoryHistoryRef = React.useRef<Array<{ id: string; time: number }>>([]);
 
   const [blockedCount, setBlockedCount] = useState(() => {
     return getAllGames().filter((g) => g.isBlocked).length;
@@ -39,6 +44,25 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeCategory, onCategoryChan
     window.addEventListener('nexus_games_updated', handleUpdate);
     return () => window.removeEventListener('nexus_games_updated', handleUpdate);
   }, []);
+
+  const handleCategorySelect = (catId: Category) => {
+    const now = Date.now();
+    categoryHistoryRef.current.push({ id: catId, time: now });
+    categoryHistoryRef.current = categoryHistoryRef.current.filter(c => now - c.time <= 5000);
+    const lastThree = categoryHistoryRef.current.slice(-3).map(c => c.id);
+    if (
+      lastThree[0] === 'Action' &&
+      (lastThree[1] === 'Arcade' || lastThree[1] === 'Retro') &&
+      lastThree[2] === 'Puzzle'
+    ) {
+      solvePart(23, 'live_action');
+    }
+
+    onCategoryChange(catId);
+    if (location.pathname !== '/') {
+      navigate('/');
+    }
+  };
 
   return (
     <aside className="w-[240px] shrink-0 hidden md:flex flex-col p-6 border-r border-white/10 bg-slate-900/40 backdrop-blur-md min-h-screen gap-6">
@@ -59,10 +83,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeCategory, onCategoryChan
                   if (document.activeElement?.tagName?.toLowerCase() === 'iframe') {
                     try { (document.activeElement as HTMLElement)?.blur(); window.focus(); } catch (e) {}
                   }
-                  onCategoryChange(cat.id);
-                  if (location.pathname !== '/') {
-                    navigate('/');
-                  }
+                  handleCategorySelect(cat.id);
                 }}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-all cursor-pointer ${
                   isActive
@@ -111,12 +132,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeCategory, onCategoryChan
       </div>
 
       <div className="mt-auto pt-6 border-t border-white/5">
-        <Link 
-          to="/updates"
-          className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4 block text-center hover:text-[var(--accent)] transition-colors cursor-pointer"
-        >
-          Nexus v2.6.0
-        </Link>
+        <div className="flex items-center justify-center gap-1.5 mb-4">
+          <Link 
+            to="/updates"
+            className="text-[10px] font-bold text-slate-500 uppercase tracking-widest hover:text-[var(--accent)] transition-colors cursor-pointer"
+          >
+            Nexus v2.6.0
+          </Link>
+          <button
+            onClick={() => openCodex()}
+            title="The 10 Seals Codex (~)"
+            className="text-[10px] font-mono text-slate-700 hover:text-amber-400/80 transition-colors cursor-pointer select-none px-1"
+          >
+            ᚱ
+          </button>
+        </div>
         
         <div className="space-y-2 mt-4">
           <Link 

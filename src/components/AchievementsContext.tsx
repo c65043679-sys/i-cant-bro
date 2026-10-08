@@ -209,6 +209,16 @@ export const ACHIEVEMENTS_CATALOG: Achievement[] = [
     category: 'Secret',
     tier: 'Gold',
     secret: true,
+  },
+  {
+    id: 'enigma_37_master',
+    title: 'Master of the 10 Seals',
+    description: 'Decipher and shatter all ten cryptic seals of the Nexus Enigma.',
+    xp: 3700,
+    iconName: 'Crown',
+    category: 'Secret',
+    tier: 'Platinum',
+    secret: true,
   }
 ];
 

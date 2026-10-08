@@ -20,14 +20,22 @@ import { BroadcastBanner } from './components/BroadcastBanner';
 import { MatrixRainCanvas } from './components/MatrixRainCanvas';
 import { GlobalPartyListener } from './components/GlobalPartyListener';
 import { GlobalEffectsListener } from './components/GlobalEffectsListener';
+import { EasterEggProvider, useEasterEgg } from './context/EasterEggContext';
+import { EasterEggCodexModal } from './components/EasterEggCodexModal';
+import { EasterEggToast } from './components/EasterEggToast';
 
 function AppContent() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<Category>('all');
   const { profile } = useAuth();
   const { settings, updateSetting } = useSettings();
+  const { solvePart, openCodex } = useEasterEgg();
   const location = useLocation();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Pilgrim's Circle (Part 24) and Quantum Transit (Part 34) tracking
+  const routeHistoryRef = useRef<string[]>([]);
+  const rapidRouteTimesRef = useRef<number[]>([]);
 
   const lastSyncedThemeRef = useRef<string | null>(null);
   React.useEffect(() => {
@@ -36,6 +44,32 @@ function AppContent() {
       updateSetting('themeColor', profile.themeColor);
     }
   }, [profile?.themeColor, settings.themeColor, updateSetting]);
+
+  // Route change tracking for Easter eggs (Part 24 & Part 34)
+  useEffect(() => {
+    const now = Date.now();
+    const currentPath = location.pathname;
+
+    // Track for Quantum Transit (Part 34: 5 hops in < 3s)
+    rapidRouteTimesRef.current.push(now);
+    rapidRouteTimesRef.current = rapidRouteTimesRef.current.filter(t => now - t <= 3000);
+    if (rapidRouteTimesRef.current.length >= 5) {
+      solvePart(34, 'live_action');
+    }
+
+    // Track for Pilgrim's Circle (Part 24: '/', '/settings', '/achievements', '/leaderboard', '/cases')
+    const hist = routeHistoryRef.current;
+    if (hist[hist.length - 1] !== currentPath) {
+      hist.push(currentPath);
+      if (hist.length > 5) hist.shift();
+
+      const pilgrimOrder = ['/', '/settings', '/achievements', '/leaderboard', '/cases'];
+      const match = pilgrimOrder.every((path, i) => hist[i] === path);
+      if (match) {
+        solvePart(24, 'live_action');
+      }
+    }
+  }, [location.pathname, solvePart]);
 
   // Scroll to top on every route change
   useEffect(() => {
@@ -133,14 +167,44 @@ function AppContent() {
         </main>
         
         <footer className="relative py-8 px-6 border-t border-white/10 text-center text-slate-500 text-sm bg-bg-dark/40 backdrop-blur-md">
-          <p>© 2026 NEXUS GAMES. All rights reserved.</p>
-          <p className="mt-2 text-slate-600">Built with passion for the browser gaming community.</p>
+          <p className="flex items-center justify-center gap-1.5 flex-wrap">
+            <span>© 2026 NEXUS GAMES. All rights reserved.</span>
+            {/* Seal 8 Micro-glyph trigger */}
+            <span
+              onClick={() => solvePart(8, 'live_action')}
+              className="cursor-pointer hover:text-amber-400 select-none opacity-30 hover:opacity-100 transition-opacity font-mono text-xs"
+              title="§10"
+            >
+              §
+            </span>
+          </p>
+          <p className="mt-2 text-slate-600 flex items-center justify-center gap-2 flex-wrap">
+            <span>Built with passion for the browser gaming community.</span>
+            {/* Seal 7 Chronometer & Hidden Codex button */}
+            <button
+              onClick={() => {
+                const s = new Date().getSeconds();
+                if (s === 10 || s === 37) {
+                  solvePart(7, 'live_action');
+                }
+                openCodex();
+              }}
+              className="text-[11px] font-mono text-slate-600 hover:text-amber-400/80 transition-colors cursor-pointer select-none"
+              title="The 10 Seals Codex (~)"
+            >
+              [ ᚱ 10 ]
+            </button>
+          </p>
         </footer>
       </div>
 
       {/* Global Performance HUD & Emergency Panic Overlay */}
       <FpsCounter />
       <PanicOverlay />
+
+      {/* 37-Part Easter Egg Codex & Toast Notifications */}
+      <EasterEggCodexModal />
+      <EasterEggToast />
     </div>
   );
 }
@@ -151,7 +215,9 @@ export default function App() {
       <AuthProvider>
         <SettingsProvider>
           <AchievementsProvider>
-            <AppContent />
+            <EasterEggProvider>
+              <AppContent />
+            </EasterEggProvider>
           </AchievementsProvider>
         </SettingsProvider>
       </AuthProvider>
