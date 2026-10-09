@@ -1156,6 +1156,24 @@ export const GAMES: Game[] = [
     sandbox: "allow-forms allow-modals allow-orientation-lock allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-presentation allow-scripts allow-same-origin allow-downloads"
   },
   {
+    id: "learn-to-fly-3",
+    title: "Learn to Fly 3",
+    description: "Build your own custom spaceship and blast your penguin into outer space! Research rockets, thrusters, bodies, and fuel tanks to escape Earth's gravity and reach the moon in this legendary upgrade sequel.",
+    thumbnail: "/images/learn to fly 3 thumbnail.jpg",
+    color: "#0369a1",
+    category: "Arcade",
+    iframe: "https://sipragio06.github.io/learn3/",
+    controls: "A/D or Left/Right arrows to steer and stabilize. Spacebar or Up Arrow to engage thrusters. 1/2/3/4 for stages and boosters.",
+    rating: 4.9,
+    featured: true,
+    trending: true,
+    aspectRatio: "video",
+    nativeWidth: 1000,
+    nativeHeight: 650,
+    allow: "autoplay; fullscreen; camera; focus-without-user-activation *; monetization; gamepad; keyboard-map *; xr-spatial-tracking; clipboard-write",
+    sandbox: "allow-forms allow-modals allow-orientation-lock allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-presentation allow-scripts allow-same-origin allow-downloads"
+  },
+  {
     id: "worlds-hardest-game",
     title: "The World's Hardest Game",
     description: "Guide your red square through 30 ultra-challenging levels. Collect yellow coins, dodge relentless blue obstacle orbs, and reach the green beacon zone. Patience, flawless timing, and precision reflex are required.",

@@ -14,6 +14,18 @@ interface UpdateItem {
 
 const UPDATES: UpdateItem[] = [
   {
+    version: "v3.2.0",
+    date: "October 8, 2026",
+    title: "Learn to Fly 3 Space Expedition",
+    description: "Added the legendary launch sequel Learn to Fly 3 to complete the iconic trilogy alongside Learn to Fly 1 and 2.",
+    type: "addition",
+    changes: [
+      "Integrated Learn to Fly 3 (https://sipragio06.github.io/learn3/) with full Ruffle web emulation and zero latency.",
+      "Custom high-resolution arcade cover art thumbnail and responsive 16:9 widescreen scaling.",
+      "Configured dedicated launch thruster and stage controls for full keyboard navigation."
+    ]
+  },
+  {
     version: "v3.1.0",
     date: "June 10, 2026",
     title: "Global Custom Themes & QoL Suite",
