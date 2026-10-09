@@ -32,7 +32,7 @@ export interface EasterEggContextType {
   checkTerminalInput: (input: string) => { success: boolean; message: string; partId?: number };
   resetProgress: () => void;
   auraActive: boolean;
-  toggleAura: () => void;
+  toggleAura: (force?: boolean) => void;
   masterKey: string;
   creatorDecree: string;
   setCreatorDecree: (decree: string) => void;
@@ -125,12 +125,18 @@ export const EasterEggProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     } catch {}
   }, []);
 
-  const toggleAura = useCallback(() => {
+  const toggleAura = useCallback((force?: boolean) => {
     setAuraActive(prev => {
-      const next = !prev;
+      const next = typeof force === 'boolean' ? force : !prev;
       try {
         localStorage.setItem(AURA_STORAGE_KEY, next ? 'true' : 'false');
       } catch {}
+      if (!next) {
+        try {
+          localStorage.setItem('nexus_godmode_aura', 'false');
+          window.dispatchEvent(new CustomEvent('nexus_godmode_toggle', { detail: false }));
+        } catch {}
+      }
       return next;
     });
   }, []);
@@ -242,11 +248,37 @@ export const EasterEggProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 - list / seals   : Lists all 10 seal codenames and runes
 - clue <1-10>    : Displays the cryptic riddle for a specific seal
 - solve <text>   : Submits an incantation or cipher answer
+- aura <on/off>  : Toggles the gold corner glow / screen aura
 - key            : Displays assembled fragments of the Apex Master Key
 - vault          : Inspects the Grand 10/10 Chamber
 - clear          : Wipes the terminal stream
 - reset          : Clears current seal progress
 (Tip: Enter answers or incantations directly into the prompt. NO HINTS are provided!)`
+      };
+    }
+
+    if (lower === 'aura off' || lower === 'glow off' || lower === 'corner glow off') {
+      toggleAura(false);
+      return {
+        success: true,
+        message: 'GOLDEN CORNER GLOW: DEACTIVATED. Screen edge aura overlay is now OFF.'
+      };
+    }
+
+    if (lower === 'aura on' || lower === 'glow on' || lower === 'corner glow on') {
+      toggleAura(true);
+      return {
+        success: true,
+        message: 'GOLDEN CORNER GLOW: ACTIVATED. Screen edge aura overlay is now ON.'
+      };
+    }
+
+    if (lower === 'aura' || lower === 'aura toggle' || lower === 'glow') {
+      const next = !auraActive;
+      toggleAura(next);
+      return {
+        success: true,
+        message: `GOLDEN CORNER GLOW: ${next ? 'ACTIVATED (ON)' : 'DEACTIVATED (OFF)'}.`
       };
     }
 
@@ -329,6 +361,28 @@ ${isCompleted ? 'THE APEX SEAL IS COMPLETE. PROCEED TO THE GRAND VAULT.' : 'Cryp
 
     const cleanedAttempt = targetAttempt.toLowerCase().replace(/['"_-]/g, ' ').replace(/\s+/g, ' ').trim();
 
+    // Master Key direct check
+    if (
+      cleanedAttempt === 'nx10 eternal genesis verified' ||
+      cleanedAttempt === 'nexus 10 eternal genesis' ||
+      lower === 'nx10-eternal-genesis-verified' ||
+      lower === 'nexus-10-eternal-genesis' ||
+      lower === 'masterkey' ||
+      lower === 'master key'
+    ) {
+      // Shatter all seals
+      ENIGMA_37_PARTS.forEach(p => {
+        if (!solvedParts[p.id]) {
+          solvePart(p.id, 'terminal_solve');
+        }
+      });
+      setActiveTab('vault');
+      return {
+        success: true,
+        message: 'APEX MASTER KEY ACCEPTED! All 10 ancient seals have converged. Grand Vault Sanctum unlocked!'
+      };
+    }
+
     // Check each part
     for (const part of ENIGMA_37_PARTS) {
       if (solvedParts[part.id]) continue; // already solved
@@ -350,9 +404,9 @@ ${isCompleted ? 'THE APEX SEAL IS COMPLETE. PROCEED TO THE GRAND VAULT.' : 'Cryp
 
     return {
       success: false,
-      message: `Unknown command or incorrect incantation for "${input}". Type 'help' or 'clue <1-37>' for guidance.`
+      message: `Unknown command or incorrect incantation for "${input}". Type 'help' or 'clue <1-10>' for guidance.`
     };
-  }, [unlockedCount, isCompleted, solvedParts, masterKey, resetProgress, isOwner, setCreatorDecree, solvePart]);
+  }, [unlockedCount, isCompleted, solvedParts, masterKey, resetProgress, isOwner, setCreatorDecree, solvePart, auraActive, toggleAura]);
 
   // Global action dispatcher listener
   useEffect(() => {

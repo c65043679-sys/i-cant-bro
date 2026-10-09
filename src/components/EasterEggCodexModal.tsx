@@ -184,8 +184,12 @@ export const EasterEggCodexModal: React.FC = () => {
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
       <div className="relative w-full max-w-5xl h-[92vh] max-h-[850px] bg-slate-950/95 border border-amber-500/30 rounded-2xl shadow-2xl shadow-amber-950/30 flex flex-col overflow-hidden font-sans">
         {/* Glow corner accents */}
-        <div className="absolute top-0 left-0 w-32 h-32 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 right-0 w-40 h-40 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+        {auraActive && (
+          <>
+            <div className="absolute top-0 left-0 w-32 h-32 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute bottom-0 right-0 w-40 h-40 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+          </>
+        )}
 
         {/* Modal Header */}
         <div className="relative z-10 px-5 py-4 border-b border-white/10 flex flex-wrap items-center justify-between gap-4 bg-slate-900/60 backdrop-blur-sm">
@@ -208,8 +212,22 @@ export const EasterEggCodexModal: React.FC = () => {
             </div>
           </div>
 
-          {/* Progress Pill & Close Button */}
-          <div className="flex items-center gap-3">
+          {/* Progress Pill, Glow Toggle & Close Button */}
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={() => toggleAura()}
+              className={`px-2.5 py-1.5 text-[11px] font-mono font-bold rounded-xl border transition-all flex items-center gap-1.5 cursor-pointer ${
+                auraActive
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30 shadow-sm shadow-amber-500/20'
+                  : 'bg-slate-900/80 text-slate-400 border-white/10 hover:text-slate-200 hover:bg-slate-800'
+              }`}
+              title={auraActive ? 'Turn off golden corner glow' : 'Turn on golden corner glow'}
+            >
+              <Sparkles className={`w-3.5 h-3.5 ${auraActive ? 'text-amber-400 animate-pulse' : 'text-slate-500'}`} />
+              <span className="hidden sm:inline">Corner Glow:</span>
+              <span className={auraActive ? 'text-amber-300' : 'text-slate-400'}>{auraActive ? 'ON' : 'OFF'}</span>
+            </button>
+
             <div className="flex items-center gap-2 bg-slate-900/80 border border-white/10 px-3 py-1.5 rounded-full">
               <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
               <span className="text-xs font-mono font-bold text-amber-300">

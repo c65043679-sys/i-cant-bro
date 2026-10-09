@@ -3,7 +3,7 @@ import { Sparkles, KeyRound, X } from 'lucide-react';
 import { useEasterEgg } from '../context/EasterEggContext';
 
 export const EasterEggToast: React.FC = () => {
-  const { latestNotification, clearNotification, openCodex, auraActive } = useEasterEgg();
+  const { latestNotification, clearNotification, openCodex, auraActive, toggleAura } = useEasterEgg();
 
   return (
     <>
@@ -13,6 +13,17 @@ export const EasterEggToast: React.FC = () => {
           <div className="absolute inset-0 border-4 border-amber-500/20 shadow-[inset_0_0_40px_rgba(245,158,11,0.15)] animate-pulse" />
           <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-amber-400/40 to-transparent" />
           <div className="absolute bottom-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-emerald-400/40 to-transparent" />
+          {/* Quick Corner Glow Dismiss */}
+          <div className="absolute top-2 right-4 pointer-events-auto opacity-60 hover:opacity-100 transition-opacity">
+            <button
+              onClick={() => toggleAura(false)}
+              className="px-2.5 py-1 rounded-full bg-slate-950/90 border border-amber-500/40 text-[10px] font-mono text-amber-300 hover:text-white flex items-center gap-1.5 shadow-lg backdrop-blur-sm cursor-pointer"
+              title="Turn off Golden Corner Glow"
+            >
+              <X className="w-3 h-3 text-amber-400" />
+              <span>Turn off Corner Glow</span>
+            </button>
+          </div>
         </div>
       )}
 

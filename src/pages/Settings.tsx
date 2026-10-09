@@ -51,7 +51,7 @@ export const Settings: React.FC = () => {
   const { user, profile, updateProfile, isOwner, signIn } = useAuth();
   const { settings, updateSetting, updateSettings, resetSettings, triggerPanic: rawTriggerPanic } = useSettings();
   const { unlockAchievement, wipeAllProgress, gamesPlayed, levelTitle } = useAchievements();
-  const { solvePart, openCodex } = useEasterEgg();
+  const { solvePart, openCodex, auraActive, toggleAura } = useEasterEgg();
 
   // Easter egg tracking refs
   const meshToggleTimesRef = React.useRef<number[]>([]);
@@ -477,6 +477,29 @@ export const Settings: React.FC = () => {
                 >
                   <div className={`w-4 h-4 rounded-full bg-white transition-all absolute top-1 ${
                     settings.enableMeshGradient ? 'right-1' : 'left-1'
+                  }`} />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between pt-4">
+                <div>
+                  <p className="text-sm font-bold text-white flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-amber-400" />
+                    Golden Corner Glow / Genesis Aura
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    Toggle the ambient golden border and corner lighting overlay unlocked by ARG seals or God Mode
+                  </p>
+                </div>
+                <button
+                  onClick={() => toggleAura()}
+                  className={`w-12 h-6 rounded-full relative transition-colors cursor-pointer ${
+                    auraActive ? 'bg-amber-500 shadow-md shadow-amber-500/30' : 'bg-slate-800'
+                  }`}
+                  title={auraActive ? "Turn off golden corner glow" : "Turn on golden corner glow"}
+                >
+                  <div className={`w-4 h-4 rounded-full bg-white transition-all absolute top-1 ${
+                    auraActive ? 'right-1' : 'left-1'
                   }`} />
                 </button>
               </div>

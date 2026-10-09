@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { X } from 'lucide-react';
 
 export const GlobalEffectsListener: React.FC = () => {
   const [godModeAura, setGodModeAura] = useState(() => {
@@ -101,9 +102,22 @@ export const GlobalEffectsListener: React.FC = () => {
 
   return (
     <div className="fixed inset-0 pointer-events-none z-[9999] border-[6px] border-amber-400/80 shadow-[inset_0_0_120px_rgba(251,191,36,0.5)] animate-pulse transition-all duration-500">
-      <div className="absolute top-2 right-4 bg-amber-500/90 text-black px-3 py-1 rounded-full font-black text-xs shadow-lg uppercase tracking-wider flex items-center gap-1.5 animate-bounce">
+      <div className="absolute top-2 right-4 bg-amber-500/90 text-black px-3 py-1 rounded-full font-black text-xs shadow-lg uppercase tracking-wider flex items-center gap-1.5 animate-bounce pointer-events-auto">
         <span className="w-2 h-2 rounded-full bg-black animate-ping" />
         God Mode Live Aura Active
+        <button
+          onClick={() => {
+            setGodModeAura(false);
+            try {
+              localStorage.setItem('nexus_godmode_aura', 'false');
+              window.dispatchEvent(new CustomEvent('nexus_godmode_toggle', { detail: false }));
+            } catch {}
+          }}
+          className="ml-1.5 p-0.5 rounded-full hover:bg-black/20 text-black cursor-pointer transition-colors"
+          title="Turn off God Mode live aura"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
       </div>
     </div>
   );
