@@ -873,6 +873,24 @@ export const GAMES: Game[] = [
     nativeHeight: 800
   },
   {
+    id: "fnaf-ucn",
+    title: "Five Nights at Freddy's: Ultimate Custom Night",
+    description: "Welcome to the ultimate FNAF mashup! Customize difficulty levels (0–20) for 50 selectable animatronic characters spanning seven games. Manage office doors, vents, air hoses, heater, A/C, music box, and power generator to survive.",
+    thumbnail: "/images/fnaf-ucn.jpg",
+    color: "#7f1d1d",
+    category: "Horror",
+    iframe: "https://irv77.github.io/hd_fnaf/ucn/",
+    controls: "Mouse to look around and flip monitor. A (Left Door), D (Right Door), W (Top Vent), S (Bottom Vent), F (Flashlight), C (Catch Fish / Death Coin), Spacebar (Desk Fan), 1-6 (Power Generator, Silent Vent, Heater, A/C, Global Music Box, Turn Off).",
+    rating: 4.9,
+    featured: true,
+    trending: true,
+    aspectRatio: "video",
+    nativeWidth: 1280,
+    nativeHeight: 720,
+    allow: "autoplay; fullscreen; camera; focus-without-user-activation *; monetization; gamepad; keyboard-map *; xr-spatial-tracking; clipboard-write",
+    sandbox: "allow-forms allow-modals allow-orientation-lock allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-presentation allow-scripts allow-same-origin allow-downloads"
+  },
+  {
     id: "pokemon-red",
     title: "Pokémon Red",
     description: "Go back to where the legendary adventure started! Journey across the original Kanto region, collect classic pocket monsters, train your squad, and defeat rival trainers to become Champion.",
