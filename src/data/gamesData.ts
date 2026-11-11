@@ -1305,5 +1305,25 @@ export const GAMES: Game[] = [
     nativeHeight: 600,
     allow: "autoplay; fullscreen; focus-without-user-activation *; gamepad; clipboard-write",
     sandbox: "allow-forms allow-modals allow-orientation-lock allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-presentation allow-scripts allow-same-origin allow-downloads"
+  },
+  {
+    id: "penalty-kick-online",
+    title: "Penalty Kick Online",
+    description: "Step up to the penalty spot in thrilling soccer shootouts! Swipe to curve shots past the goalkeeper into the top corner, then put on the keeper gloves to dive and save incoming strikes.",
+    thumbnail: "/images/penalty kick online.jpg",
+    color: "#0284c7",
+    category: "Sports",
+    iframe: "https://rawcdn.githack.com/PenaltyKickOnline/PenaltyKickOnline.github.io/f432955990ac6493d47a17a9e56fbc3e7483713a/index.html",
+    controls: "Click and drag or swipe with mouse/finger to aim, bend, and shoot. As goalkeeper, drag gloves across the goal to deflect shots.",
+    rating: 4.9,
+    featured: true,
+    trending: true,
+    multiplayer: true,
+    players: "1-2 Players / Online",
+    aspectRatio: "video",
+    nativeWidth: 1280,
+    nativeHeight: 720,
+    allow: "autoplay; fullscreen; gamepad; focus-without-user-activation *; keyboard-map *; clipboard-write",
+    sandbox: "allow-forms allow-modals allow-orientation-lock allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-presentation allow-scripts allow-same-origin allow-downloads"
   }
 ];
