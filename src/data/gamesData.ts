@@ -1325,5 +1325,25 @@ export const GAMES: Game[] = [
     nativeHeight: 720,
     allow: "autoplay; fullscreen; gamepad; focus-without-user-activation *; keyboard-map *; clipboard-write",
     sandbox: "allow-forms allow-modals allow-orientation-lock allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-presentation allow-scripts allow-same-origin allow-downloads"
+  },
+  {
+    id: "boxing-random",
+    title: "Boxing Random",
+    description: "Step into the ring for hilarious physics-based ragdoll boxing! Launch wild flying punches with unpredictable limbs, changing arenas, and one-button chaos against the CPU or a friend.",
+    thumbnail: "/images/boxing random.jpg",
+    color: "#dc2626",
+    category: "Sports",
+    iframe: "https://unblokedgames.github.io/projects/boxing-random/frame.html",
+    controls: "Player 1: W key to jump and punch. Player 2: Up Arrow key to jump and punch. (Supports 2 players on one keyboard!)",
+    rating: 4.8,
+    featured: true,
+    trending: true,
+    multiplayer: true,
+    players: "1-2 Players",
+    aspectRatio: "video",
+    nativeWidth: 1280,
+    nativeHeight: 720,
+    allow: "autoplay; fullscreen; gamepad; focus-without-user-activation *; keyboard-map *; clipboard-write",
+    sandbox: "allow-forms allow-modals allow-orientation-lock allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-presentation allow-scripts allow-same-origin allow-downloads"
   }
 ];
